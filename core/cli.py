@@ -2,12 +2,19 @@ import argparse
 import os
 from utils import formatOutputLine
 import json
+from typing import Callable, Iterator, Any
 
-def findCommentSymbols(extension: str, root: os.PathLike = os.path.dirname(__file__)) -> bytes | tuple[bytes, bytes] | tuple[bytes, tuple[bytes, bytes]]:
-    with open(os.path.join(root, "config.json"), 'rb') as config:
-        languageMetadata = json.loads(config.read())
-        singleLineCommentSymbol: str = languageMetadata["symbols"].get(extension)
-        multiLineCommentSymbolPair: str = languageMetadata["multilined"].get(extension)
+with open(os.path.join(os.path.dirname(__file__), "config.json"), 'rb') as config:
+    CONFIG: dict = json.loads(config.read())
+
+def findCommentSymbols(extension: str, symbolMapping: dict[str, dict[str, str]] = CONFIG) -> bytes | tuple[bytes, bytes] | tuple[bytes, tuple[bytes, bytes]]:
+        '''### Find symbols that denote a comment for a specific language
+        
+        #### args
+        extension: File extension of the language\n
+        symbolMapping: Mapping of file extensions and their corresponding symbols. Keys are `symbols` for single-line comments and `multilined` for multi-line comments. See `config.json` for the actual mapping'''
+        singleLineCommentSymbol: str = symbolMapping["symbols"].get(extension)
+        multiLineCommentSymbolPair: str = symbolMapping["multilined"].get(extension)
         if multiLineCommentSymbolPair:
             multiLineCommentSymbolPair = multiLineCommentSymbolPair.split(" ")
 
@@ -25,6 +32,9 @@ def findCommentSymbols(extension: str, root: os.PathLike = os.path.dirname(__fil
 def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStart: str | None = None, multiLineEnd: str | None = None) -> tuple[int, int]:
     loc: int = 0
     currentLine: int = 0
+    singleCommentSymbolLength: int = len(singleCommentSymbol)
+    multlineStartLength: int = None if not multiLineStart else len(multiLineStart)
+    multlineEndLength: int = None if not multiLineEnd else len(multiLineStart)
     with open(filepath, 'rb') as file:
         commentedBlock: bool = False            # Multiple multilineStarts will still have the same effect as one, so a single flag is enough
         for line in file:
@@ -36,18 +46,16 @@ def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStart: s
                 continue
 
             # Deal with multiline comments, if the language supports it
-            if multilineStart:
+            if multiLineStart:
                 # Scan entire line
                 idx: int = 0
                 validLine: bool = False
-                multlineStartLength: int = len(multilineStart)
-                multlineEndLength: int = len(multilineEnd)
                 while idx < len(line):
-                    if line[idx:idx+multlineStartLength] == multilineStart:
+                    if line[idx:idx+multlineStartLength] == multiLineStart:
                         commentedBlock = True
                         idx += multlineStartLength
                         continue
-                    elif line[idx:idx+multlineEndLength] == multilineEnd:
+                    elif line[idx:idx+multlineEndLength] == multiLineEnd:
                         commentedBlock = False
                         idx += multlineEndLength
                         continue
@@ -61,15 +69,69 @@ def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStart: s
                 currentLine+=1
 
             # Finally, deal with single line comments
-            if singleLine:
-                if line[:len(singleLine)] == singleLine:
+            if singleCommentSymbol:
+                if line[:singleCommentSymbolLength] == singleCommentSymbol:
                     currentLine+=1
-                elif not multilineStart:
+                elif not multiLineStart:
                     loc+=1
                     currentLine += 1
 
         return loc, currentLine
      
+def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilterFunction : Callable = lambda x: True, directoryFilterFunction: Callable = lambda x : False, recurse:bool = False, level:int = 0, loc: int = 0, totalLines: int = 0) -> tuple[int, int] | None:
+    '''#### Iterate over every file in given root directory, and optionally perform the same for every file within its subdirectories\n
+    #### args:
+    dirData: Output of os.walk() on root directory\n
+    Function: Function to handle inclusion/exclusion logic at the file level (file names and file extensions)\n
+    directoryFilterFunction: Function to handle inclusion/exclusion logic at the directory level
+    level: Count of how many directories deep the current function is searching, increases per recursion
+
+    #### returns:
+    integer pair of LOC and total lines scanned if no output path specified, else None
+    '''
+    ...
+
+    materialisedDirData: list = list(dirData)
+    rootDirectory: os.PathLike = materialisedDirData[level][0]
+    print(str(rootDirectory))
+
+    # Directory excluded
+    if not directoryFilterFunction(rootDirectory) and level != 0:
+        print("Skipping dir: ", rootDirectory)
+        return None
+    for file in materialisedDirData[level][2]:
+        # File excluded
+        if not fileFilterFunction(file):
+            continue
+
+        symbolData = findCommentSymbols(file.split(".")[-1])  
+        singleLine, multilineStart, multilineEnd = None, None, None
+
+        if isinstance(symbolData, bytes):
+            singleLine = symbolData
+        elif isinstance(symbolData[1], bytes):
+            multilineStart, multilineEnd = symbolData
+        else:
+            singleLine, (multilineStart, multilineEnd) = symbolData
+
+
+        l, tl = parseFile(os.path.join(rootDirectory, file), singleLine, multilineStart, multilineEnd)
+        totalLines += tl
+        loc += l
+    
+    if not recurse:
+        return loc, totalLines
+
+    # All files have parsed in this directory
+    for dir in materialisedDirData[level][1]:
+        if not directoryFilter(dir):
+            continue
+        sub_dir_data = os.walk(os.path.join(rootDirectory, dir))
+        l, tl = parseDirectory(sub_dir_data, fileFilterFunction, directoryFilterFunction, recurse, level + 1, loc, totalLines)
+        loc += l
+        totalLines += tl
+
+    return loc, totalLines
 
 parser: argparse.ArgumentParser = argparse.ArgumentParser(description="A simple CLI tool to count lines of code (LOC) of your files")
 
@@ -151,13 +213,17 @@ if __name__ == "__main__":
         print(f"ERROR: {args.dir} is not a valid directory")
         exit(500)
     
+    ### Handle file-level filtering logic, if any ###
+    bFileFilter: bool = False
+
     # Either inclusion or exclusion can be specified, but not both
     bInclusion: bool = bool(args.include_type or args.include_file)
+    if bInclusion or (args.exclude_file or args.exclude_type):
+        bFileFilter = True
+
     if ((args.exclude_file or args.exclude_type) and bInclusion):
         print(f"ERROR: Only one of inclusion (-it, -if) or exclusion (-xf, xt) can be specified, but not both")
         exit(500)
-
-    bDirInclude: bool = False
 
     # Can use short circuit now since we are sure that only inclusion or exclusion has been specified
     extensions: list[str] = args.exclude_type or args.include_type or []
@@ -167,16 +233,36 @@ if __name__ == "__main__":
     # Casting to set for faster lookups
     extensionSet: frozenset = frozenset(extension for extension in extensions)
     fileSet: frozenset = frozenset(file for file in files)
-    dirSet: frozenset = frozenset(dir for dir in dirs)
 
-    # File inclusion logic (If !bInclusion, then conditions are just complemented)
-    isValid = lambda file: (file.split(".")[-1] in extensionSet or file in fileSet) if bInclusion else (file.split(".")[-1] not in extensionSet and file not in fileSet)
+    # Function for determining valid files
+    if bFileFilter:
+        fileFilter = lambda file: (file.split(".")[-1] in extensionSet or file in fileSet) if bInclusion else (file.split(".")[-1] not in extensionSet and file not in fileSet)
+    else:
+        fileFilter = lambda _ : True    # No file filter logic given, return True blindly
+    
+    ### Handle direcotory-level filtering logic, if any ###
+    bDirFilter: bool = args.include_dir or args.exclude_dir
 
-    # Directory inclusion/exclusion logic
-    # scanDir = lambda dir: (dir in dirSet) if bDirInclude
+    if bDirFilter:
+        bDirInclusion: bool = False
+        directories: set = {}
+        if (args.include_dir and args.exclude_dir):
+            print(f"ERROR: Both directory inclusion and exclusion rules cannot be specified together")
+            exit(500)
+        
+        if args.include_dir:
+            directories = set(*args.include_dir)
+            bDirInclusion = True
+        directories = set(*args.exlcude_dirs)
 
-    # Traverse through directory, count files
-    locMetadata: dict[str[str, int]] = {}
+        # Cast for faster lookups
+        dirSet: frozenset = frozenset(dir for dir in directories)
+        
+        directoryFilter = lambda dir : dir in dirSet if bInclusion else dir not in dirSet
+    else:
+        directoryFilter = lambda _ : False if not args.recurse else True          # No directory filters given, accept subdirectories based on recurse flag
 
     root: os.PathLike = os.path.abspath(args.dir)
     root_data = os.walk(root)
+
+    x = parseDirectory(root_data, fileFilter, directoryFilter, True)
