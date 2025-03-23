@@ -97,17 +97,20 @@ def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilt
     ...
 
     materialisedDirData: list = list(dirData)
-    rootDirectory: os.PathLike = materialisedDirData[level][0]
-    print(str(rootDirectory))
+    print(materialisedDirData)
+    rootDirectory: os.PathLike = materialisedDirData[0][0]
 
     # Directory excluded
     if not directoryFilterFunction(rootDirectory) and level != 0:
         print("Skipping dir: ", rootDirectory)
         return None
-    for file in materialisedDirData[level][2]:
+    print("Scanning dir: ", rootDirectory, level)
+    for file in materialisedDirData[0][2]:
         # File excluded
         if not fileFilterFunction(file):
+            print("Skipping file: ", file)
             continue
+        print("Scanning file: ", file)
 
         symbolData = findCommentSymbols(file.split(".")[-1])  
         singleLine, multilineStart, multilineEnd = None, None, None
@@ -119,7 +122,6 @@ def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilt
         else:
             singleLine, (multilineStart, multilineEnd) = symbolData
 
-
         l, tl = parseFile(os.path.join(rootDirectory, file), singleLine, multilineStart, multilineEnd)
         totalLines += tl
         loc += l
@@ -127,14 +129,15 @@ def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilt
     if not recurse:
         return loc, totalLines
 
-    # All files have parsed in this directory
-    for dir in materialisedDirData[level][1]:
+    # All files have been parsed in this directory, recurse
+    for dir in materialisedDirData[0][1]:
         if not directoryFilter(dir):
             continue
-        sub_dir_data = os.walk(os.path.join(rootDirectory, dir))
-        l, tl = parseDirectory(sub_dir_data, fileFilterFunction, directoryFilterFunction, recurse, level + 1, loc, totalLines)
-        loc += l
-        totalLines += tl
+        subdirectoryData = os.walk(os.path.join(rootDirectory, dir))
+        op = parseDirectory(subdirectoryData, fileFilterFunction, directoryFilterFunction, recurse, level+1, loc, totalLines)
+        if op:
+            loc = op[0]
+            totalLines = op[1]
 
     return loc, totalLines
 
@@ -256,9 +259,9 @@ if __name__ == "__main__":
             exit(500)
         
         if args.include_dir:
-            directories = set(*args.include_dir)
+            directories = set(args.include_dir)
             bDirInclusion = True
-        directories = set(*args.exclude_dir)
+        directories = set(args.exclude_dir)
 
         # Cast for faster lookups
         dirSet: frozenset = frozenset(dir for dir in directories)
