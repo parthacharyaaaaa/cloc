@@ -22,6 +22,54 @@ def findCommentSymbols(extension: str, root: os.PathLike = os.path.dirname(__fil
         
         return singleLineCommentSymbol.encode(), (multiLineCommentSymbolPair[0].encode(), multiLineCommentSymbolPair[1].encode())
 
+def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStart: str | None = None, multiLineEnd: str | None = None) -> tuple[int, int]:
+    loc: int = 0
+    currentLine: int = 0
+    with open(filepath, 'rb') as file:
+        commentedBlock: bool = False            # Multiple multilineStarts will still have the same effect as one, so a single flag is enough
+        for line in file:
+            line: bytes = line.strip()
+
+            # Deal with empty lines, irrespective of whether they are in a commented block or not
+            if not line:
+                currentLine+=1
+                continue
+
+            # Deal with multiline comments, if the language supports it
+            if multilineStart:
+                # Scan entire line
+                idx: int = 0
+                validLine: bool = False
+                multlineStartLength: int = len(multilineStart)
+                multlineEndLength: int = len(multilineEnd)
+                while idx < len(line):
+                    if line[idx:idx+multlineStartLength] == multilineStart:
+                        commentedBlock = True
+                        idx += multlineStartLength
+                        continue
+                    elif line[idx:idx+multlineEndLength] == multilineEnd:
+                        commentedBlock = False
+                        idx += multlineEndLength
+                        continue
+                    elif not commentedBlock:
+                        validLine = True
+
+                    idx += 1
+                
+                if validLine:
+                    loc+=1
+                currentLine+=1
+
+            # Finally, deal with single line comments
+            if singleLine:
+                if line[:len(singleLine)] == singleLine:
+                    currentLine+=1
+                elif not multilineStart:
+                    loc+=1
+                    currentLine += 1
+
+        return loc, currentLine
+     
 
 parser: argparse.ArgumentParser = argparse.ArgumentParser(description="A simple CLI tool to count lines of code (LOC) of your files")
 
@@ -85,55 +133,7 @@ if __name__ == "__main__":
                 multilineStart: bytes = symbolData[1][0]
                 multilineEnd: bytes = symbolData[1][1]
 
-        loc: int = 0
-        currentLine: int = 0
-        symbolStack: list = []
-        with open(args.file, 'rb') as file:
-            commentedBlock: bool = False            # Multiple multilineStarts will still have the same effect as one, so a single flag is enough
-            for line in file:
-                line: bytes = line.strip()
-
-                # Deal with empty lines, irrespective of whether they are in a commented block or not
-                if not line:
-                    currentLine+=1
-                    print("Empty: ", currentLine)
-                    continue
-
-                # Deal with multiline comments, if the language supports it
-                if multilineStart:
-                    # Scan entire line
-                    idx: int = 0
-                    validLine: bool = False
-                    multlineStartLength: int = len(multilineStart)
-                    multlineEndLength: int = len(multilineEnd)
-                    while idx < len(line):
-                        if line[idx:idx+multlineStartLength] == multilineStart:
-                            commentedBlock = True
-                            idx += multlineStartLength
-                            continue
-                        elif line[idx:idx+multlineEndLength] == multilineEnd:
-                            commentedBlock = False
-                            idx += multlineEndLength
-                            continue
-                        elif not commentedBlock:
-                            validLine = True
-    
-                        idx += 1
-                    
-                    if validLine:
-                        print("LOC: ", line)
-                        loc+=1
-                    currentLine+=1
-
-                # Finally, deal with single line comments
-                if singleLine:
-                    if line[:len(singleLine)] == singleLine:
-                        currentLine+=1
-                    elif not multilineStart:
-                        loc+=1
-                        print("LOC", currentLine, line)
-                        currentLine += 1
-
+        loc, currentLine = parseFile(args.file, singleLine, multilineStart, multilineEnd)
         if not args.output:
             print(formatOutputLine(args.file, loc))
             print(currentLine)
