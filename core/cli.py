@@ -1,6 +1,6 @@
 import argparse
 import os
-from utils import formatOutputLine
+from utils import formatOutputLine, dumpOutputJSON, dumpOutputXML
 import json
 from typing import Callable, Iterator, Any
 
@@ -81,9 +81,9 @@ def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStartSym
 
             currentLine+=1
 
-        return loc, currentLine
+        return loc, currentLine+1
      
-def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilterFunction : Callable = lambda x: True, directoryFilterFunction: Callable = lambda x : False, recurse:bool = False, level:int = 0, loc: int = 0, totalLines: int = 0) -> tuple[int, int] | None:
+def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilterFunction: Callable = lambda x: True, directoryFilterFunction: Callable = lambda x : False, recurse:bool = False, level:int = 0, loc: int = 0, totalLines: int = 0, outputMapping: dict = {"general" : {}}) -> tuple[int, int] | None:
     '''#### Iterate over every file in given root directory, and optionally perform the same for every file within its subdirectories\n
     #### args:
     dirData: Output of os.walk() on root directory\n
@@ -95,7 +95,7 @@ def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilt
     integer pair of LOC and total lines scanned if no output path specified, else None
     '''
     ...
-
+    # TODO: Remove complete materialisation of dirData
     materialisedDirData: list = list(dirData)
     print(materialisedDirData)
     rootDirectory: os.PathLike = materialisedDirData[0][0]
@@ -125,22 +125,27 @@ def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilt
         l, tl = parseFile(os.path.join(rootDirectory, file), singleLine, multilineStart, multilineEnd)
         totalLines += tl
         loc += l
+        if not outputMapping.get(rootDirectory):
+            outputMapping[rootDirectory] = {}
+        outputMapping[rootDirectory][file] = {"loc" : loc, "total_lines" : tl}
+        outputMapping["general"]["LOC"] = loc
+        outputMapping["general"]["Total"] = totalLines
     
     if not recurse:
-        return loc, totalLines
+        return outputMapping
 
     # All files have been parsed in this directory, recurse
     for dir in materialisedDirData[0][1]:
         if not directoryFilter(dir):
             continue
         subdirectoryData = os.walk(os.path.join(rootDirectory, dir))
-        op = parseDirectory(subdirectoryData, fileFilterFunction, directoryFilterFunction, recurse, level+1, loc, totalLines)
-        if op:
-            loc = op[0]
-            totalLines = op[1]
+        outputMapping = parseDirectory(subdirectoryData, fileFilterFunction, directoryFilterFunction, recurse, level+1, loc, totalLines)
 
-    return loc, totalLines
+    return outputMapping
 
+def formatOutputTOML(outputMapping: dict, fpath: os.PathLike): ...
+def formatOutputYAML(outputMapping: dict, fpath: os.PathLike): ...
+def formatOutputSQL(outputMapping: dict, fpath: os.PathLike): ...
 parser: argparse.ArgumentParser = argparse.ArgumentParser(description="A simple CLI tool to count lines of code (LOC) of your files")
 
 parser.add_argument("-v", "--version", help="Current version of cloc", action="store_true")
@@ -274,4 +279,11 @@ if __name__ == "__main__":
     root_data = os.walk(root)
 
     x = parseDirectory(root_data, fileFilter, directoryFilter, True)
-    print(x)
+    if args.output:
+        args.output = args.output[0]
+        extension: str = args.output.split(".")[-1].lower()
+
+        if extension == "json":
+            dumpOutputJSON(x, args.output)
+        elif extension == "xml":
+            dumpOutputXML(x, args.output)
