@@ -29,12 +29,12 @@ def findCommentSymbols(extension: str, symbolMapping: dict[str, dict[str, str]] 
         
         return singleLineCommentSymbol.encode(), (multiLineCommentSymbolPair[0].encode(), multiLineCommentSymbolPair[1].encode())
 
-def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStart: str | None = None, multiLineEnd: str | None = None) -> tuple[int, int]:
+def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStartSymbol: str | None = None, multiLineEndSymbol: str | None = None) -> tuple[int, int]:
     loc: int = 0
     currentLine: int = 0
     singleCommentSymbolLength: int = len(singleCommentSymbol)
-    multlineStartLength: int = None if not multiLineStart else len(multiLineStart)
-    multlineEndLength: int = None if not multiLineEnd else len(multiLineStart)
+    multiCommentStartSymbolLength: int = 0 if not multiLineStartSymbol else len(multiLineStartSymbol)
+    multiCommentEndSymbolLength: int = 0 if not multiLineEndSymbol else len(multiLineEndSymbol)
     with open(filepath, 'rb') as file:
         commentedBlock: bool = False            # Multiple multilineStarts will still have the same effect as one, so a single flag is enough
         for line in file:
@@ -45,20 +45,29 @@ def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStart: s
                 currentLine+=1
                 continue
 
+            # Firstly, deal with single line comments if the language supports it (Looking at you, HTML, even if I don't consider you a language)
+            if singleCommentSymbol and line[:singleCommentSymbolLength] == singleCommentSymbol:
+                # Line is commented, increment line counter and continue
+                currentLine+=1
+                continue
+
             # Deal with multiline comments, if the language supports it
-            if multiLineStart:
+            if multiLineStartSymbol:
                 # Scan entire line
                 idx: int = 0
                 validLine: bool = False
                 while idx < len(line):
-                    if line[idx:idx+multlineStartLength] == multiLineStart:
+                    if line[idx:idx+multiCommentStartSymbolLength] == multiLineStartSymbol:
                         commentedBlock = True
-                        idx += multlineStartLength
+                        idx += multiCommentStartSymbolLength
                         continue
-                    elif line[idx:idx+multlineEndLength] == multiLineEnd:
+                    elif line[idx:idx+multiCommentEndSymbolLength] == multiLineEndSymbol:
                         commentedBlock = False
-                        idx += multlineEndLength
+                        idx += multiCommentEndSymbolLength
                         continue
+                    elif line[idx:idx+singleCommentSymbolLength] == singleCommentSymbol:
+                        # Single comment symbol appears, anything after this is irrelevent
+                        break
                     elif not commentedBlock:
                         validLine = True
 
@@ -66,15 +75,11 @@ def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStart: s
                 
                 if validLine:
                     loc+=1
-                currentLine+=1
+            else:
+                # Multiline logic ended, and check for single line symbol at start of the line has yielded False
+                loc+=1
 
-            # Finally, deal with single line comments
-            if singleCommentSymbol:
-                if line[:singleCommentSymbolLength] == singleCommentSymbol:
-                    currentLine+=1
-                elif not multiLineStart:
-                    loc+=1
-                    currentLine += 1
+            currentLine+=1
 
         return loc, currentLine
      
@@ -253,7 +258,7 @@ if __name__ == "__main__":
         if args.include_dir:
             directories = set(*args.include_dir)
             bDirInclusion = True
-        directories = set(*args.exlcude_dirs)
+        directories = set(*args.exclude_dir)
 
         # Cast for faster lookups
         dirSet: frozenset = frozenset(dir for dir in directories)
@@ -266,3 +271,4 @@ if __name__ == "__main__":
     root_data = os.walk(root)
 
     x = parseDirectory(root_data, fileFilter, directoryFilter, True)
+    print(x)
