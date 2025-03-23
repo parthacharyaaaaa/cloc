@@ -1,6 +1,6 @@
 import argparse
 import os
-from utils import formatOutputLine, dumpOutputJSON, dumpOutputXML
+from utils import formatOutputLine, dumpOutputJSON, dumpOutputXML, dumpOutputSQL
 import json
 from typing import Callable, Iterator, Any
 
@@ -287,3 +287,5 @@ if __name__ == "__main__":
             dumpOutputJSON(x, args.output)
         elif extension == "xml":
             dumpOutputXML(x, args.output)
+        elif extension == "sql" or extension == "db":
+            dumpOutputSQL(x, args.output)
