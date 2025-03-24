@@ -2,7 +2,6 @@
 import os
 from typing import Any, Callable, Iterator
 from utils import findCommentSymbols
-import warnings
 
 def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStartSymbol: str | None = None, multiLineEndSymbol: str | None = None) -> tuple[int, int]:
     loc: int = 0
@@ -94,7 +93,6 @@ def parseDirectoryNoVerbose(dirData: Iterator[tuple[Any, list[Any], list[Any]]],
     # All files have been parsed in this directory, recurse
     for dir in materialisedDirData[0][1]:
         if not directoryFilterFunction(dir):
-            print("Skipping directory:", dir)
             continue
         # Walk over and parse subdirectory
         subdirectoryData = os.walk(os.path.join(rootDirectory, dir))
@@ -104,7 +102,6 @@ def parseDirectoryNoVerbose(dirData: Iterator[tuple[Any, list[Any], list[Any]]],
         outputMapping["loc"] = outputMapping["loc"] + localLOC
         outputMapping["total"] = outputMapping["total"] + localTotal
         outputMapping.update(op)
-
 
     return outputMapping
 
@@ -124,14 +121,12 @@ def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilt
     materialisedDirData: list = list(dirData)
     rootDirectory: os.PathLike = materialisedDirData[0][0]
 
-    print("Scanning dir: ", rootDirectory, level)
     if not outputMapping:
         outputMapping = {"general" : {}}
     for file in materialisedDirData[0][2]:
         # File excluded
         if not fileFilterFunction(file):
             continue
-
         symbolData = findCommentSymbols(file.split(".")[-1])  
         singleLine, multilineStart, multilineEnd = None, None, None
 
@@ -171,8 +166,8 @@ def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilt
 
     return outputMapping
 
-@warnings.warn("This method of parsing a directory is a failed implementation using collections.deque to reduce stack usage", category=type[DeprecationWarning])
 def parseDirectoryDeque(dir: os.PathLike, fileFilterFunction: Callable = lambda outputMapping: True, directoryFilterFunction: Callable = lambda outputMapping : False, recurse: bool = False) -> tuple[int, int] | None:
+    '''Slower, non-recursive implementation of parseDirectory'''
     from collections import deque
     directories: deque = deque()
     directories.append(dir)

@@ -1,6 +1,9 @@
 import argparse
 import os
-from utils import formatOutputLine, dumpOutputJSON, dumpOutputXML, dumpOutputSQL, dumpOutputSTD, findCommentSymbols
+from utils import findCommentSymbols
+from utils import OUTPUT_MAPPING
+from typing import Callable
+from types import MappingProxyType
 from parsing import parseDirectory, parseDirectoryNoVerbose, parseFile
 from datetime import datetime
 import platform
@@ -53,28 +56,31 @@ if __name__ == "__main__":
         # Fetch comment symbols if not specified via -cs
         if not symbolData:
             symbolData = findCommentSymbols(args.file.split(".")[-1])
+            singleLine, multiLineStart, multiLineEnd = None, None, None
             if isinstance(symbolData, bytes):
                 # Single line only
                 singleLine: bytes = symbolData
-                multilineEnd, multilineStart = None, None
             elif isinstance(symbolData[1], bytes):
                 # Multiline only
-                singleLine = None
-                multilineStart: bytes = symbolData[0]
-                multilineEnd: bytes = symbolData[1]
+                multiLineStart: bytes = symbolData[0]
+                multiLineEnd: bytes = symbolData[1]
             else:
                 # Both single line and multiline
                 singleLine: bytes = symbolData[0]
-                multilineStart: bytes = symbolData[1][0]
-                multilineEnd: bytes = symbolData[1][1]
+                multiLineStart: bytes = symbolData[1][0]
+                multiLineEnd: bytes = symbolData[1][1]
 
-        loc, currentLine = parseFile(args.file, singleLine, multilineStart, multilineEnd)
+        loc, total = parseFile(args.file, singleLine, multiLineStart, multiLineEnd)
+        outputMapping: MappingProxyType = MappingProxyType({"loc" : loc, "total" : total, "time" : datetime.now().strftime("%d/%m/%y, at %H:%M:%S"), "platform" : platform.system()})
         if not args.output:
-            print(formatOutputLine(args.file, loc))
-            print(currentLine)
-            print("Scan ended")
-        exit(200)
+            print(outputMapping)
+        else:
+            outputFiletype: str = args.output[0].split(".")[-1].lower()
 
+            # Fetch output function based on file extension, default to standard write logic
+            outputFunction: Callable = OUTPUT_MAPPING.get(outputFiletype, OUTPUT_MAPPING[None])
+            outputFunction(outputMapping=outputMapping, fpath=args.output[0])
+        exit(200)
 
     # Directory
     if not args.dir:
@@ -148,19 +154,11 @@ if __name__ == "__main__":
         outputMapping["platform"] = platform.system()
 
     if args.output:
-        args.output = args.output[0]
-        outputTkns = args.output.split(".")
-        if len(outputTkns) == 1:
-            extension: str = None
-        else:
-            extension: str = outputTkns[-1]
-        outputTkns = None
+        outputFiletype: str = args.output[0].split(".")[-1].lower()
 
-        if extension == "json":
-            dumpOutputJSON(outputMapping, args.output)
-        elif extension == "xml":
-            dumpOutputXML(outputMapping, args.output)
-        elif extension == "sql" or extension == "db":
-            dumpOutputSQL(outputMapping, args.output)
-        elif extension in {"txt", "log", "logs", None, ""}:
-            dumpOutputSTD(outputMapping, args.output)
+        # Fetch output function based on file extension, default to standard write logic
+        outputFunction: Callable = OUTPUT_MAPPING.get(outputFiletype, OUTPUT_MAPPING[None])
+        outputFunction(outputMapping=outputMapping, fpath=args.output[0])
+    else:
+        print(outputMapping)
+        exit(200)

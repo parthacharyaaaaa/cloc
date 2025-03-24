@@ -1,4 +1,5 @@
 '''Helper functions'''
+from types import MappingProxyType
 import json
 import xml.etree.ElementTree as ETree
 import os
@@ -30,7 +31,6 @@ def findCommentSymbols(extension: str, symbolMapping: dict[str, dict[str, str]] 
         
         return singleLineCommentSymbol.encode(), (multiLineCommentSymbolPair[0].encode(), multiLineCommentSymbolPair[1].encode())
 
-
 def castMappingToXML(mapping: dict, tag: str | None = None) -> ETree.Element:
     tree: ETree = ETree.Element(tag or "cloc dumps")
     for k,v in mapping.items():
@@ -40,9 +40,6 @@ def castMappingToXML(mapping: dict, tag: str | None = None) -> ETree.Element:
         subTag = ETree.SubElement(tree, k)
         subTag.text = str(v)
     return tree
-
-def formatOutputLine(fname: str, loc: int) -> str:
-    return f"{fname}: {loc} LOC\n"
 
 def dumpOutputSTD(outputMapping: dict, fpath: os.PathLike) -> None:
     '''Dump output to a standard text/log file'''
@@ -55,7 +52,8 @@ def dumpOutputJSON(outputMapping: dict, fpath: os.PathLike) -> None:
     with open(os.path.join(os.getcwd(), fpath), "w+") as dumpFile:
         dumpFile.write(json.dumps(outputMapping, skipkeys=True,
                                   ensure_ascii=True,
-                                  indent="\t"))
+                                  indent="\t",
+                                  default=dict))
 
 def dumpOutputXML(outputMapping: dict, fpath: os.PathLike) -> None:
     '''Dump output to XML file, with proper formatting'''
@@ -119,3 +117,14 @@ def dumpOutputSQL(outputMapping: dict, fpath: os.PathLike) -> None:
             dbCursor = None
         dbConnection.close()
         dbConnection = None
+
+def dumpOutputCSV(outputMapping: dict, fpath: os.PathLike) -> None: ...
+
+OUTPUT_MAPPING: MappingProxyType = MappingProxyType({
+    "json" : dumpOutputJSON,
+    "db" : dumpOutputSQL,
+    "sql" : dumpOutputSQL,
+    "xml" : dumpOutputXML,
+    "csv" : dumpOutputCSV,
+    None : dumpOutputSTD
+})
