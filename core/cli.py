@@ -140,10 +140,12 @@ if __name__ == "__main__":
 
     if args.verbose:
         outputMapping = parseDirectory(root_data, fileFilter, directoryFilter, args.recurse)
+        outputMapping["general"]["time"] = datetime.now().strftime("%d/%m/%y, at %H:%M:%S")
+        outputMapping["general"]["platform"] = platform.system()
     else:
         outputMapping = parseDirectoryNoVerbose(root_data, fileFilter, directoryFilter, args.recurse)
-    outputMapping["general"]["time"] = datetime.now().strftime("%d/%m/%y, at %H:%M:%S")
-    outputMapping["general"]["platform"] = platform.system()
+        outputMapping["time"] = datetime.now().strftime("%d/%m/%y, at %H:%M:%S")
+        outputMapping["platform"] = platform.system()
 
     if args.output:
         args.output = args.output[0]

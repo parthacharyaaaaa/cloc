@@ -87,28 +87,34 @@ def dumpOutputSQL(outputMapping: dict, fpath: os.PathLike) -> None:
                          platform VARCHAR(32));
                          ''')
         
-        dbCursor.execute('''
-                         CREATE TABLE IF NOT EXISTS file_data (ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                         directory VARCHAR(1024) NOT NULL,
-                         _name VARCHAR(1024) NOT NULL,
-                         LOC INTEGER DEFAULT 0,
-                         total_lines INTEGER DEFAULT 0);
-                        ''')
-        dbConnection.commit()
-
         # DML
-        # Clear out all previous data
-        for table in ("general","file_data"):
-            dbConnection.execute(f"DELETE FROM {table}")
-        dbConnection.commit()
-
-        dbConnection.execute("INSERT INTO general VALUES (?, ?, ?, ?)", (outputMapping['general']["LOC"], outputMapping['general']["Total"], outputMapping['general']["time"], outputMapping['general']["platform"]))
+        if not outputMapping.get("general"):
+            # !Verbose, insert general data and exit
+            dbConnection.execute("DELETE FROM general;")            
+            dbConnection.execute("INSERT INTO general VALUES (?, ?, ?, ?)", (outputMapping["loc"], outputMapping["total"], outputMapping["time"], outputMapping["platform"]))
+            dbConnection.commit()
         
-        outputMapping.pop("general")
-        for directory, fileMapping in outputMapping.items():
-            dbCursor.executemany("INSERT INTO file_data (directory, _name, LOC, total_lines) VALUES (?, ?, ?, ?);",
-                                 ([directory, filename, fileData["loc"], fileData["total_lines"]] for filename, fileData in fileMapping.items()))
-        dbConnection.commit()
+        else:
+            dbCursor.execute('''
+                            CREATE TABLE IF NOT EXISTS file_data (ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                            directory VARCHAR(1024) NOT NULL,
+                            _name VARCHAR(1024) NOT NULL,
+                            LOC INTEGER DEFAULT 0,
+                            total_lines INTEGER DEFAULT 0);
+                            ''')
+            dbConnection.commit()
+            # Clear out all previous data
+            for table in ("general","file_data"):
+                dbConnection.execute(f"DELETE FROM {table}")
+            dbConnection.commit()
+
+            dbConnection.execute("INSERT INTO general VALUES (?, ?, ?, ?)", (outputMapping['general']["loc"], outputMapping['general']["total"], outputMapping['general']["time"], outputMapping['general']["platform"]))
+            
+            outputMapping.pop("general")
+            for directory, fileMapping in outputMapping.items():
+                dbCursor.executemany("INSERT INTO file_data (directory, _name, LOC, total_lines) VALUES (?, ?, ?, ?);",
+                                    ([directory, filename, fileData["loc"], fileData["total_lines"]] for filename, fileData in fileMapping.items()))
+            dbConnection.commit()
     finally:
         if dbCursor:
             dbCursor = None

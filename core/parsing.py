@@ -63,7 +63,7 @@ def parseDirectoryNoVerbose(dirData: Iterator[tuple[Any, list[Any], list[Any]]],
 
     print("Scanning dir: ", rootDirectory, level)
     if not outputMapping:
-        outputMapping = {"general" : {"loc" : 0, "total" : 0}}
+        outputMapping = {"loc" : 0, "total" : 0}
 
     for file in materialisedDirData[0][2]:
         # File excluded
@@ -84,8 +84,8 @@ def parseDirectoryNoVerbose(dirData: Iterator[tuple[Any, list[Any], list[Any]]],
         totalLines += tl
         loc += l
 
-    outputMapping["general"]["loc"] = loc
-    outputMapping["general"]["total"] = totalLines
+    outputMapping["loc"] = loc
+    outputMapping["total"] = totalLines
     
     if not recurse:
         return outputMapping
@@ -100,8 +100,8 @@ def parseDirectoryNoVerbose(dirData: Iterator[tuple[Any, list[Any], list[Any]]],
         op = parseDirectory(subdirectoryData, fileFilterFunction, directoryFilterFunction, True, level+1)
 
         localLOC, localTotal = op.pop("general").values()
-        outputMapping["general"]["loc"] = outputMapping["general"]["loc"] + localLOC
-        outputMapping["general"]["total"] = outputMapping["general"]["total"] + localTotal
+        outputMapping["loc"] = outputMapping["loc"] + localLOC
+        outputMapping["total"] = outputMapping["total"] + localTotal
         outputMapping.update(op)
 
 
@@ -116,7 +116,7 @@ def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilt
     level: Count of how many directories deep the current function is searching, increases per recursion
 
     #### returns:
-    integer pair of LOC and total lines scanned if no output path specified, else None
+    integer pair of loc and total lines scanned if no output path specified, else None
     '''
     ...
     # TODO: Remove complete materialisation of dirData
@@ -147,8 +147,8 @@ def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilt
         if not outputMapping.get(rootDirectory):
             outputMapping[rootDirectory] = {}
         outputMapping[rootDirectory][file] = {"loc" : l, "total_lines" : tl}
-    outputMapping["general"]["LOC"] = loc
-    outputMapping["general"]["Total"] = totalLines
+    outputMapping["general"]["loc"] = loc
+    outputMapping["general"]["total"] = totalLines
     
     if not recurse:
         return outputMapping
@@ -163,8 +163,8 @@ def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilt
         op = parseDirectory(subdirectoryData, fileFilterFunction, directoryFilterFunction, True, level+1)
 
         localLOC, localTotal = op.pop("general").values()
-        outputMapping["general"]["LOC"] = outputMapping["general"]["LOC"] + localLOC
-        outputMapping["general"]["Total"] = outputMapping["general"]["Total"] + localTotal
+        outputMapping["general"]["loc"] = outputMapping["general"]["loc"] + localLOC
+        outputMapping["general"]["total"] = outputMapping["general"]["total"] + localTotal
         outputMapping.update(op)
 
 
