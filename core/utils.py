@@ -60,22 +60,17 @@ def dumpOutputSQL(outputMapping: dict, fpath: os.PathLike):
                          ''')
         
         dbCursor.execute('''
-                         CREATE TABLE IF NOT EXISTS directory (ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                         _name VARCHAR(1024) NOT NULL UNIQUE);
-                         ''')
-        
-        dbCursor.execute('''
                          CREATE TABLE IF NOT EXISTS file_data (ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                         directory INTEGER NOT NULL,
+                         directory VARCHAR(1024) NOT NULL,
                          _name VARCHAR(1024) NOT NULL,
                          LOC INTEGER DEFAULT 0,
-                         total_lines INTEGER DEFAULT 0,
-                         FOREIGN KEY (directory) references directory(ID));
+                         total_lines INTEGER DEFAULT 0);
                         ''')
         dbConnection.commit()
 
         # DML
-        for table in ("general","file_data", "directory"):
+        # Clear out all previous data
+        for table in ("general","file_data"):
             dbConnection.execute(f"DELETE FROM {table}")
         dbConnection.commit()
 
@@ -83,11 +78,8 @@ def dumpOutputSQL(outputMapping: dict, fpath: os.PathLike):
         
         outputMapping.pop("general")
         for directory, fileMapping in outputMapping.items():
-            print(fileMapping)
-            dbCursor.execute("INSERT INTO directory (_name) VALUES (?) RETURNING ID", (directory,))
-            _id: int = dbCursor.fetchone()[0]
             dbCursor.executemany("INSERT INTO file_data (directory, _name, LOC, total_lines) VALUES (?, ?, ?, ?);",
-                                 ([_id, filename, fileData["loc"], fileData["total_lines"]] for filename, fileData in fileMapping.items()))
+                                 ([directory, filename, fileData["loc"], fileData["total_lines"]] for filename, fileData in fileMapping.items()))
         dbConnection.commit()
     finally:
         if dbCursor:
