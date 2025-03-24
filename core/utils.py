@@ -48,6 +48,10 @@ def dumpOutputSQL(outputMapping: dict, fpath: os.PathLike):
 
     # No context manager protocol in sqlite3 cursors :(
     try:
+        # Enable Foreign Keys if this current driver hasn't done so already
+        dbCursor.execute("PRAGMA foreign_keys = ON;")
+
+        # DDL
         dbCursor.execute('''
                          CREATE TABLE IF NOT EXISTS general (LOC INTEGER DEFAULT 0,
                          total_lines INTEGER DEFAULT 0,
@@ -62,14 +66,16 @@ def dumpOutputSQL(outputMapping: dict, fpath: os.PathLike):
         
         dbCursor.execute('''
                          CREATE TABLE IF NOT EXISTS file_data (ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                         directory INTEGER NOT NULL references directory,
+                         directory INTEGER NOT NULL,
                          _name VARCHAR(1024) NOT NULL,
                          LOC INTEGER DEFAULT 0,
-                         total_lines INTEGER DEFAULT 0);
+                         total_lines INTEGER DEFAULT 0,
+                         FOREIGN KEY (directory) references directory(ID));
                         ''')
         dbConnection.commit()
 
-        for table in ("general", "directory", "file_data"):
+        # DML
+        for table in ("general","file_data", "directory"):
             dbConnection.execute(f"DELETE FROM {table}")
         dbConnection.commit()
 
