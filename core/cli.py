@@ -1,156 +1,10 @@
 import argparse
 import os
-from utils import formatOutputLine, dumpOutputJSON, dumpOutputXML, dumpOutputSQL
-import json
-from typing import Callable, Iterator, Any
+from utils import formatOutputLine, dumpOutputJSON, dumpOutputXML, dumpOutputSQL, dumpOutputSTD, findCommentSymbols
+from parsing import parseDirectory, parseDirectoryNoVerbose, parseFile
+from datetime import datetime
+import platform
 
-with open(os.path.join(os.path.dirname(__file__), "config.json"), 'rb') as config:
-    CONFIG: dict = json.loads(config.read())
-
-def findCommentSymbols(extension: str, symbolMapping: dict[str, dict[str, str]] = CONFIG) -> bytes | tuple[bytes, bytes] | tuple[bytes, tuple[bytes, bytes]]:
-        '''### Find symbols that denote a comment for a specific language
-        
-        #### args
-        extension: File extension of the language\n
-        symbolMapping: Mapping of file extensions and their corresponding symbols. Keys are `symbols` for single-line comments and `multilined` for multi-line comments. See `config.json` for the actual mapping'''
-        singleLineCommentSymbol: str = symbolMapping["symbols"].get(extension)
-        multiLineCommentSymbolPair: str = symbolMapping["multilined"].get(extension)
-        if multiLineCommentSymbolPair:
-            multiLineCommentSymbolPair = multiLineCommentSymbolPair.split(" ")
-
-        if not (singleLineCommentSymbol or multiLineCommentSymbolPair):        
-            print(f"No comment symbols found for extension .{extension}")
-            exit(500)
-
-        if not multiLineCommentSymbolPair:
-            return singleLineCommentSymbol.encode()
-        if not singleLineCommentSymbol:
-            return multiLineCommentSymbolPair[0].encode(), multiLineCommentSymbolPair[1].encode()
-        
-        return singleLineCommentSymbol.encode(), (multiLineCommentSymbolPair[0].encode(), multiLineCommentSymbolPair[1].encode())
-
-def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStartSymbol: str | None = None, multiLineEndSymbol: str | None = None) -> tuple[int, int]:
-    loc: int = 0
-    currentLine: int = 0
-    singleCommentSymbolLength: int = len(singleCommentSymbol)
-    multiCommentStartSymbolLength: int = 0 if not multiLineStartSymbol else len(multiLineStartSymbol)
-    multiCommentEndSymbolLength: int = 0 if not multiLineEndSymbol else len(multiLineEndSymbol)
-    with open(filepath, 'rb') as file:
-        commentedBlock: bool = False            # Multiple multilineStarts will still have the same effect as one, so a single flag is enough
-        for line in file:
-            line: bytes = line.strip()
-
-            # Deal with empty lines, irrespective of whether they are in a commented block or not
-            if not line:
-                currentLine+=1
-                continue
-
-            # Firstly, deal with single line comments if the language supports it (Looking at you, HTML, even if I don't consider you a language)
-            if singleCommentSymbol and line[:singleCommentSymbolLength] == singleCommentSymbol:
-                # Line is commented, increment line counter and continue
-                currentLine+=1
-                continue
-
-            # Deal with multiline comments, if the language supports it
-            if multiLineStartSymbol:
-                # Scan entire line
-                idx: int = 0
-                validLine: bool = False
-                while idx < len(line):
-                    if line[idx:idx+multiCommentStartSymbolLength] == multiLineStartSymbol:
-                        commentedBlock = True
-                        idx += multiCommentStartSymbolLength
-                        continue
-                    elif line[idx:idx+multiCommentEndSymbolLength] == multiLineEndSymbol:
-                        commentedBlock = False
-                        idx += multiCommentEndSymbolLength
-                        continue
-                    elif line[idx:idx+singleCommentSymbolLength] == singleCommentSymbol:
-                        # Single comment symbol appears, anything after this is irrelevent
-                        break
-                    elif not commentedBlock:
-                        validLine = True
-
-                    idx += 1
-                
-                if validLine:
-                    loc+=1
-            else:
-                # Multiline logic ended, and check for single line symbol at start of the line has yielded False
-                loc+=1
-
-            currentLine+=1
-
-        return loc, currentLine+1
-     
-def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilterFunction: Callable = lambda x: True, directoryFilterFunction: Callable = lambda x : False, recurse:bool = False, level:int = 0, loc: int = 0, totalLines: int = 0, outputMapping: dict = None) -> tuple[int, int] | None:
-    '''#### Iterate over every file in given root directory, and optionally perform the same for every file within its subdirectories\n
-    #### args:
-    dirData: Output of os.walk() on root directory\n
-    Function: Function to handle inclusion/exclusion logic at the file level (file names and file extensions)\n
-    directoryFilterFunction: Function to handle inclusion/exclusion logic at the directory level
-    level: Count of how many directories deep the current function is searching, increases per recursion
-
-    #### returns:
-    integer pair of LOC and total lines scanned if no output path specified, else None
-    '''
-    ...
-    # TODO: Remove complete materialisation of dirData
-    materialisedDirData: list = list(dirData)
-    rootDirectory: os.PathLike = materialisedDirData[0][0]
-
-    print("Scanning dir: ", rootDirectory, level)
-    if not outputMapping:
-        outputMapping = {"general" : {}}
-    for file in materialisedDirData[0][2]:
-        # File excluded
-        if not fileFilterFunction(file):
-            # print("Skipping file: ", file)
-            continue
-        # print("Scanning file: ", file)
-
-        symbolData = findCommentSymbols(file.split(".")[-1])  
-        singleLine, multilineStart, multilineEnd = None, None, None
-
-        if isinstance(symbolData, bytes):
-            singleLine = symbolData
-        elif isinstance(symbolData[1], bytes):
-            multilineStart, multilineEnd = symbolData
-        else:
-            singleLine, (multilineStart, multilineEnd) = symbolData
-
-        l, tl = parseFile(os.path.join(rootDirectory, file), singleLine, multilineStart, multilineEnd)
-        totalLines += tl
-        loc += l
-        if not outputMapping.get(rootDirectory):
-            outputMapping[rootDirectory] = {}
-        outputMapping[rootDirectory][file] = {"loc" : l, "total_lines" : tl}
-    outputMapping["general"]["LOC"] = loc
-    outputMapping["general"]["Total"] = totalLines
-    
-    if not recurse:
-        return outputMapping
-
-    # All files have been parsed in this directory, recurse
-    for dir in materialisedDirData[0][1]:
-        if not directoryFilter(dir):
-            print("Skipping directory:", dir)
-            continue
-        # Walk over and parse subdirectory
-        subdirectoryData = os.walk(os.path.join(rootDirectory, dir))
-        op = parseDirectory(subdirectoryData, fileFilterFunction, directoryFilterFunction, True, level+1)
-
-        localLOC, localTotal = op.pop("general").values()
-        outputMapping["general"]["LOC"] = outputMapping["general"]["LOC"] + localLOC
-        outputMapping["general"]["Total"] = outputMapping["general"]["Total"] + localTotal
-        outputMapping.update(op)
-
-
-    return outputMapping
-
-def formatOutputTOML(outputMapping: dict, fpath: os.PathLike): ...
-def formatOutputYAML(outputMapping: dict, fpath: os.PathLike): ...
-def formatOutputSQL(outputMapping: dict, fpath: os.PathLike): ...
 parser: argparse.ArgumentParser = argparse.ArgumentParser(description="A simple CLI tool to count lines of code (LOC) of your files")
 
 parser.add_argument("-v", "--version", help="Current version of cloc", action="store_true")
@@ -163,8 +17,8 @@ parser.add_argument("-xt", "--exclude-type", nargs="+", help="[OPTIONAL] Exclude
 parser.add_argument("-id", "--include-dir", nargs="+", help="[OPTIONAL] Include directories by name")
 parser.add_argument("-if", "--include-file", nargs="+", help="[OPTIONAL] Include files by name")
 parser.add_argument("-it", "--include-type", nargs="+", help="[OPTIONAL] Include files by extension, useful for specificity when working with directories with files for different languages")
+parser.add_argument("-vb", "--verbose", help="Get LOC and total lines for every file scanned", action="store_true")
 parser.add_argument("-o", "--output", nargs=1, help="[OPTIONAL] Specify output file to dump counts into. If not specified, output is dumped to stdout. If output file is in .json, .toml, .yaml, or .db/.sql format, then output is ordered differently.")
-parser.add_argument("-g", "--group", help="[OPTIONAL] Group LOC counts by file types", action="store_true")
 parser.add_argument("-r", "--recurse", help="[OPTIONAL] Recursively scan every sub-directory too", action="store_true")
 
 if __name__ == "__main__":
@@ -283,14 +137,28 @@ if __name__ == "__main__":
     root: os.PathLike = os.path.abspath(args.dir)
     root_data = os.walk(root)
 
-    x = parseDirectory(root_data, fileFilter, directoryFilter, args.recurse)
+    if args.verbose:
+        outputMapping = parseDirectory(root_data, fileFilter, directoryFilter, args.recurse)
+    else:
+        outputMapping = parseDirectoryNoVerbose(root_data, fileFilter, directoryFilter, args.recurse)
+    outputMapping["general"]["time"] = datetime.now().strftime("%d/%m/%y, at %H:%M:%S")
+    outputMapping["general"]["platform"] = platform.system()
+
+
     if args.output:
         args.output = args.output[0]
-        extension: str = args.output.split(".")[-1].lower()
+        outputTkns = args.output.split(".")
+        if len(outputTkns) == 1:
+            extension: str = None
+        else:
+            extension: str = outputTkns[-1]
+        outputTkns = None
 
         if extension == "json":
-            dumpOutputJSON(x, args.output)
+            dumpOutputJSON(outputMapping, args.output)
         elif extension == "xml":
-            dumpOutputXML(x, args.output)
+            dumpOutputXML(outputMapping, args.output)
         elif extension == "sql" or extension == "db":
-            dumpOutputSQL(x, args.output)
+            dumpOutputSQL(outputMapping, args.output)
+        elif extension in {"txt", "log", "logs", None, ""}:
+            dumpOutputSTD(outputMapping, args.output)
