@@ -4,6 +4,7 @@ from utils import formatOutputLine, dumpOutputJSON, dumpOutputXML, dumpOutputSQL
 from parsing import parseDirectory, parseDirectoryNoVerbose, parseFile
 from datetime import datetime
 import platform
+from config import FLAGS
 
 parser: argparse.ArgumentParser = argparse.ArgumentParser(description="A simple CLI tool to count lines of code (LOC) of your files")
 
@@ -17,9 +18,9 @@ parser.add_argument("-xt", "--exclude-type", nargs="+", help="[OPTIONAL] Exclude
 parser.add_argument("-id", "--include-dir", nargs="+", help="[OPTIONAL] Include directories by name")
 parser.add_argument("-if", "--include-file", nargs="+", help="[OPTIONAL] Include files by name")
 parser.add_argument("-it", "--include-type", nargs="+", help="[OPTIONAL] Include files by extension, useful for specificity when working with directories with files for different languages")
-parser.add_argument("-vb", "--verbose", help="Get LOC and total lines for every file scanned", action="store_true")
+parser.add_argument("-vb", "--verbose", help="Get LOC and total lines for every file scanned", action="store_true", default=FLAGS.verbose)
 parser.add_argument("-o", "--output", nargs=1, help="[OPTIONAL] Specify output file to dump counts into. If not specified, output is dumped to stdout. If output file is in .json, .toml, .yaml, or .db/.sql format, then output is ordered differently.")
-parser.add_argument("-r", "--recurse", help="[OPTIONAL] Recursively scan every sub-directory too", action="store_true")
+parser.add_argument("-r", "--recurse", help="[OPTIONAL] Recursively scan every sub-directory too", action="store_true", default=FLAGS.recurse)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -143,7 +144,6 @@ if __name__ == "__main__":
         outputMapping = parseDirectoryNoVerbose(root_data, fileFilter, directoryFilter, args.recurse)
     outputMapping["general"]["time"] = datetime.now().strftime("%d/%m/%y, at %H:%M:%S")
     outputMapping["general"]["platform"] = platform.system()
-
 
     if args.output:
         args.output = args.output[0]
