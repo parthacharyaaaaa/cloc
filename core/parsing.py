@@ -6,7 +6,7 @@ from utils import findCommentSymbols
 def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStartSymbol: str | None = None, multiLineEndSymbol: str | None = None) -> tuple[int, int]:
     loc: int = 0
     currentLine: int = 0
-    singleCommentSymbolLength: int = len(singleCommentSymbol)
+    singleCommentSymbolLength: int = 0 if not singleCommentSymbol else len(singleCommentSymbol)
     multiCommentStartSymbolLength: int = 0 if not multiLineStartSymbol else len(multiLineStartSymbol)
     multiCommentEndSymbolLength: int = 0 if not multiLineEndSymbol else len(multiLineEndSymbol)
     with open(filepath, 'rb') as file:
