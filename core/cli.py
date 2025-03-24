@@ -127,7 +127,7 @@ def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilt
         loc += l
         if not outputMapping.get(rootDirectory):
             outputMapping[rootDirectory] = {}
-        outputMapping[rootDirectory][file] = {"loc" : loc, "total_lines" : tl}
+        outputMapping[rootDirectory][file] = {"loc" : l, "total_lines" : tl}
         outputMapping["general"]["LOC"] = loc
         outputMapping["general"]["Total"] = totalLines
     
