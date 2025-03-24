@@ -49,7 +49,6 @@ def dumpOutputSTD(outputMapping: dict, fpath: os.PathLike) -> None:
     with open(fpath, "w+") as file:
         mainMetadata: str = "\n".join(tuple(f"{k} : {v}" for k,v in outputMapping.pop("general").items()))
         file.write(mainMetadata)
-        return
 
 def dumpOutputJSON(outputMapping: dict, fpath: os.PathLike) -> None:
     '''Dump output to JSON file, with proper formatting'''

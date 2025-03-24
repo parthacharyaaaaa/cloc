@@ -2,6 +2,7 @@
 import os
 from typing import Any, Callable, Iterator
 from utils import findCommentSymbols
+import warnings
 
 def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStartSymbol: str | None = None, multiLineEndSymbol: str | None = None) -> tuple[int, int]:
     loc: int = 0
@@ -167,5 +168,47 @@ def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilt
         outputMapping["general"]["total"] = outputMapping["general"]["total"] + localTotal
         outputMapping.update(op)
 
+
+    return outputMapping
+
+@warnings.warn("This method of parsing a directory is a failed implementation using collections.deque to reduce stack usage", category=type[DeprecationWarning])
+def parseDirectoryDeque(dir: os.PathLike, fileFilterFunction: Callable = lambda outputMapping: True, directoryFilterFunction: Callable = lambda outputMapping : False, recurse: bool = False) -> tuple[int, int] | None:
+    from collections import deque
+    directories: deque = deque()
+    directories.append(dir)
+    outputMapping: dict = {"general" : {"loc" : 0, "total" : 0}}
+    
+    while directories:
+        currentScanDir: os.PathLike = directories.popleft()
+        print("Scanning dir: ", currentScanDir)
+
+        try:
+            for entry in os.scandir(currentScanDir):
+                    if entry.is_dir() and directoryFilterFunction(entry.name) and recurse:  
+                            print("Adding dir:", entry)
+                            directories.append(entry.path)
+                    elif entry.is_file() and fileFilterFunction(entry.name):
+                        # File good to be parsed
+                        print("Scanning file:", entry.name)
+                        singleLine, multilineStart, multilineEnd = None, None, None
+                        symbolData = findCommentSymbols(entry.name.split(".")[-1])  
+
+                        if isinstance(symbolData, bytes):
+                            singleLine = symbolData
+                        elif isinstance(symbolData[1], bytes):
+                            multilineStart, multilineEnd = symbolData
+                        else:
+                            singleLine, (multilineStart, multilineEnd) = symbolData
+                        
+                        loc, total_lines = parseFile(entry.path, singleLine, multilineStart, multilineEnd)
+                        outputMapping["general"]["loc"] += loc
+                        outputMapping["general"]["total"] += total_lines
+                        outputMapping.setdefault(currentScanDir, {})[entry.name] = {
+                            "loc": loc, "total_lines": total_lines
+                        }
+                    else:
+                        print("skipped:", entry.name)
+        except PermissionError:
+            print(f"Skipping {currentScanDir} due to permission error.")
 
     return outputMapping
