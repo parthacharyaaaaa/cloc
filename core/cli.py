@@ -83,7 +83,7 @@ def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStartSym
 
         return loc, currentLine+1
      
-def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilterFunction: Callable = lambda x: True, directoryFilterFunction: Callable = lambda x : False, recurse:bool = False, level:int = 0, loc: int = 0, totalLines: int = 0, outputMapping: dict = {"general" : {}}) -> tuple[int, int] | None:
+def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilterFunction: Callable = lambda x: True, directoryFilterFunction: Callable = lambda x : False, recurse:bool = False, level:int = 0, loc: int = 0, totalLines: int = 0, outputMapping: dict = None) -> tuple[int, int] | None:
     '''#### Iterate over every file in given root directory, and optionally perform the same for every file within its subdirectories\n
     #### args:
     dirData: Output of os.walk() on root directory\n
@@ -97,20 +97,17 @@ def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilt
     ...
     # TODO: Remove complete materialisation of dirData
     materialisedDirData: list = list(dirData)
-    print(materialisedDirData)
     rootDirectory: os.PathLike = materialisedDirData[0][0]
 
-    # Directory excluded
-    if not directoryFilterFunction(rootDirectory) and level != 0:
-        print("Skipping dir: ", rootDirectory)
-        return None
     print("Scanning dir: ", rootDirectory, level)
+    if not outputMapping:
+        outputMapping = {"general" : {}}
     for file in materialisedDirData[0][2]:
         # File excluded
         if not fileFilterFunction(file):
-            print("Skipping file: ", file)
+            # print("Skipping file: ", file)
             continue
-        print("Scanning file: ", file)
+        # print("Scanning file: ", file)
 
         symbolData = findCommentSymbols(file.split(".")[-1])  
         singleLine, multilineStart, multilineEnd = None, None, None
@@ -128,8 +125,8 @@ def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilt
         if not outputMapping.get(rootDirectory):
             outputMapping[rootDirectory] = {}
         outputMapping[rootDirectory][file] = {"loc" : l, "total_lines" : tl}
-        outputMapping["general"]["LOC"] = loc
-        outputMapping["general"]["Total"] = totalLines
+    outputMapping["general"]["LOC"] = loc
+    outputMapping["general"]["Total"] = totalLines
     
     if not recurse:
         return outputMapping
@@ -137,9 +134,17 @@ def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], fileFilt
     # All files have been parsed in this directory, recurse
     for dir in materialisedDirData[0][1]:
         if not directoryFilter(dir):
+            print("Skipping directory:", dir)
             continue
+        # Walk over and parse subdirectory
         subdirectoryData = os.walk(os.path.join(rootDirectory, dir))
-        outputMapping = parseDirectory(subdirectoryData, fileFilterFunction, directoryFilterFunction, recurse, level+1, loc, totalLines)
+        op = parseDirectory(subdirectoryData, fileFilterFunction, directoryFilterFunction, True, level+1)
+
+        localLOC, localTotal = op.pop("general").values()
+        outputMapping["general"]["LOC"] = outputMapping["general"]["LOC"] + localLOC
+        outputMapping["general"]["Total"] = outputMapping["general"]["Total"] + localTotal
+        outputMapping.update(op)
+
 
     return outputMapping
 
@@ -278,7 +283,7 @@ if __name__ == "__main__":
     root: os.PathLike = os.path.abspath(args.dir)
     root_data = os.walk(root)
 
-    x = parseDirectory(root_data, fileFilter, directoryFilter, True)
+    x = parseDirectory(root_data, fileFilter, directoryFilter, args.recurse)
     if args.output:
         args.output = args.output[0]
         extension: str = args.output.split(".")[-1].lower()
