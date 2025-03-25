@@ -4,7 +4,7 @@ from utils import findCommentSymbols
 from utils import OUTPUT_MAPPING
 from typing import Callable
 from types import MappingProxyType
-from parsing import parseDirectory, parseDirectoryNoVerbose, parseFile, pyParseFile
+from parsing import parseDirectory, parseDirectoryNoVerbose, parseFile
 from datetime import datetime
 import platform
 from config import FLAGS

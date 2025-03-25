@@ -31,16 +31,6 @@ def findCommentSymbols(extension: str, symbolMapping: dict[str, dict[str, str]] 
         
         return singleLineCommentSymbol.encode(), (multiLineCommentSymbolPair[0].encode(), multiLineCommentSymbolPair[1].encode())
 
-def castMappingToXML(mapping: dict, tag: str | None = None) -> ETree.Element:
-    tree: ETree = ETree.Element(tag or "cloc dumps")
-    for k,v in mapping.items():
-        if isinstance(v, dict):
-            tree.append(castMappingToXML(mapping[k], k))
-            continue
-        subTag = ETree.SubElement(tree, k)
-        subTag.text = str(v)
-    return tree
-
 def dumpOutputSTD(outputMapping: dict, fpath: os.PathLike) -> None:
     '''Dump output to a standard text/log file'''
     with open(fpath, "w+") as file:
@@ -59,14 +49,6 @@ def dumpOutputJSON(outputMapping: dict, fpath: os.PathLike) -> None:
                                   ensure_ascii=True,
                                   indent="\t",
                                   default=dict))
-
-def dumpOutputXML(outputMapping: dict, fpath: os.PathLike) -> None:
-    '''Dump output to XML file, with proper formatting'''
-    root = castMappingToXML(outputMapping)
-    tree = ETree.ElementTree(root)          # What am I even trying to do here man
-    fpath = fpath if fpath[-4:] == ".xml" else fpath + ".xml"
-    with open(os.path.join(os.getcwd(), fpath), "wb+") as dumpFile:
-        tree.write(dumpFile, 'utf-8', True) # omfg there's no indentation function
 
 def dumpOutputSQL(outputMapping: dict, fpath: os.PathLike) -> None:
     '''Dump output to a SQLite database (.db, .sql)'''
@@ -129,7 +111,6 @@ OUTPUT_MAPPING: MappingProxyType = MappingProxyType({
     "json" : dumpOutputJSON,
     "db" : dumpOutputSQL,
     "sql" : dumpOutputSQL,
-    "xml" : dumpOutputXML,
     "csv" : dumpOutputCSV,
     None : dumpOutputSTD
 })
