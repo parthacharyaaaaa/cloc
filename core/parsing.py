@@ -55,7 +55,7 @@ def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStartSym
 
             currentLine+=1
 
-        return loc, currentLine+1
+        return loc, currentLine
      
 def parseDirectoryNoVerbose(dirData: Iterator[tuple[Any, list[Any], list[Any]]], customSymbols: dict = None, fileFilterFunction: Callable = lambda outputMapping: True, directoryFilterFunction: Callable = lambda outputMapping : False, recurse:bool = False, level:int = 0, loc: int = 0, totalLines: int = 0, outputMapping: dict = None) -> dict[str, str | int]:
     materialisedDirData: list = list(dirData)

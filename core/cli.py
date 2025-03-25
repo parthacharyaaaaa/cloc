@@ -51,7 +51,6 @@ if __name__ == "__main__":
         symbolData["multistart"] = pairing[0].encode()
         symbolData['multiend'] = pairing[1].encode()
 
-    print(symbolData)
     # Single file, no need to check and validate other flags
     if bIsFile:     
         if not os.path.exists(args.file):
