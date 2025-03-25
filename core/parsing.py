@@ -2,6 +2,7 @@
 import os
 from typing import Any, Callable, Iterator
 from utils import findCommentSymbols
+from ctypes_interfacing import lib, LineScanResult
 
 def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStartSymbol: str | None = None, multiLineEndSymbol: str | None = None) -> tuple[int, int]:
     loc: int = 0
@@ -11,46 +12,15 @@ def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStartSym
     multiCommentEndSymbolLength: int = 0 if not multiLineEndSymbol else len(multiLineEndSymbol)
     with open(filepath, 'rb') as file:
         commentedBlock: bool = False            # Multiple multilineStarts will still have the same effect as one, so a single flag is enough
-        for total, line in enumerate(file, start=1):
-            line: bytes = line.strip()
+        for total, line in enumerate(file, start = 1):
+            res: LineScanResult = lib.scanLine(line, len(line), commentedBlock, singleCommentSymbol, singleCommentSymbolLength, multiLineStartSymbol, multiCommentStartSymbolLength, multiLineEndSymbol, multiCommentEndSymbolLength)
 
-            # Deal with empty lines, irrespective of whether they are in a commented block or not
-            if not line:
-                continue
-
-            # Firstly, deal with single line comments if the language supports it (Looking at you, HTML, even if I don't consider you a language)
-            if singleCommentSymbol and line[:singleCommentSymbolLength] == singleCommentSymbol:
-                # Line is commented, increment line counter and continue
-                continue
-
-            # Deal with multiline comments, if the language supports it
-            if multiLineStartSymbol:
-                # Scan entire line
-                idx: int = 0
-                validLine: bool = False
-                while idx < len(line):
-                    if line[idx:idx+multiCommentStartSymbolLength] == multiLineStartSymbol:
-                        commentedBlock = True
-                        idx += multiCommentStartSymbolLength
-                        continue
-                    elif line[idx:idx+multiCommentEndSymbolLength] == multiLineEndSymbol:
-                        commentedBlock = False
-                        idx += multiCommentEndSymbolLength
-                        continue
-                    elif line[idx:idx+singleCommentSymbolLength] == singleCommentSymbol:
-                        # Single comment symbol appears, anything after this is irrelevent
-                        break
-                    elif not commentedBlock:
-                        validLine = True
-                    idx += 1
-                if validLine:
-                    loc+=1
-            else:
-                # Multiline logic ended, and check for single line symbol at start of the line has yielded False
+            commentedBlock = res.commentedBlock
+            if res.isValid:
                 loc+=1
-
         return loc, total
-     
+  
+
 def parseDirectoryNoVerbose(dirData: Iterator[tuple[Any, list[Any], list[Any]]], customSymbols: dict = None, fileFilterFunction: Callable = lambda outputMapping: True, directoryFilterFunction: Callable = lambda outputMapping : False, recurse:bool = False, level:int = 0, loc: int = 0, totalLines: int = 0, outputMapping: dict = None) -> dict[str, str | int]:
     materialisedDirData: list = list(dirData)
     rootDirectory: os.PathLike = materialisedDirData[0][0]
@@ -169,6 +139,56 @@ def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], customSy
 
 
     return outputMapping
+
+def pyParseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStartSymbol: str | None = None, multiLineEndSymbol: str | None = None) -> tuple[int, int]:
+    '''Previous implementation of a file parsing function in pure Python. Replaced by parseFile for better performance'''
+    loc: int = 0
+    total: int = 0
+    singleCommentSymbolLength: int = 0 if not singleCommentSymbol else len(singleCommentSymbol)
+    multiCommentStartSymbolLength: int = 0 if not multiLineStartSymbol else len(multiLineStartSymbol)
+    multiCommentEndSymbolLength: int = 0 if not multiLineEndSymbol else len(multiLineEndSymbol)
+    with open(filepath, 'rb') as file:
+        commentedBlock: bool = False            # Multiple multilineStarts will still have the same effect as one, so a single flag is enough
+        for total, line in enumerate(file, start=1):
+            line: bytes = line.strip()
+
+            # Deal with empty lines, irrespective of whether they are in a commented block or not
+            if not line:
+                continue
+
+            # Firstly, deal with single line comments if the language supports it (Looking at you, HTML, even if I don't consider you a language)
+            if singleCommentSymbol and line[:singleCommentSymbolLength] == singleCommentSymbol:
+                # Line is commented, increment line counter and continue
+                continue
+
+            # Deal with multiline comments, if the language supports it
+            if multiLineStartSymbol:
+                # Scan entire line
+                idx: int = 0
+                validLine: bool = False
+                while idx < len(line):
+                    if line[idx:idx+multiCommentStartSymbolLength] == multiLineStartSymbol:
+                        commentedBlock = True
+                        idx += multiCommentStartSymbolLength
+                        continue
+                    elif line[idx:idx+multiCommentEndSymbolLength] == multiLineEndSymbol:
+                        commentedBlock = False
+                        idx += multiCommentEndSymbolLength
+                        continue
+                    elif line[idx:idx+singleCommentSymbolLength] == singleCommentSymbol:
+                        # Single comment symbol appears, anything after this is irrelevent
+                        break
+                    elif not commentedBlock:
+                        validLine = True
+                    idx += 1
+                if validLine:
+                    loc+=1
+            else:
+                # Multiline logic ended, and check for single line symbol at start of the line has yielded False
+                loc+=1
+
+        return loc, total
+     
 
 def parseDirectoryDeque(dir: os.PathLike, fileFilterFunction: Callable = lambda outputMapping: True, directoryFilterFunction: Callable = lambda outputMapping : False, recurse: bool = False) -> tuple[int, int] | None:
     '''Slower, non-recursive implementation of parseDirectory'''

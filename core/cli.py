@@ -4,7 +4,7 @@ from utils import findCommentSymbols
 from utils import OUTPUT_MAPPING
 from typing import Callable
 from types import MappingProxyType
-from parsing import parseDirectory, parseDirectoryNoVerbose, parseFile
+from parsing import parseDirectory, parseDirectoryNoVerbose, parseFile, pyParseFile
 from datetime import datetime
 import platform
 from config import FLAGS
@@ -12,7 +12,7 @@ from config import FLAGS
 parser: argparse.ArgumentParser = argparse.ArgumentParser(description="A simple CLI tool to count lines of code (LOC) of your files")
 
 parser.add_argument("-v", "--version", help="Current version of cloc", action="store_true")
-parser.add_argument("-d", "--dir", nargs=1, help="Specify the directory to scan. Either this or '-d' must be used")
+parser.add_argument("-d", "--dir", nargs=1, help="Specify the directory to scan. Either this or '-f' must be used")
 parser.add_argument("-f", "--file", nargs=1, help="Specify the file to scan. Either this or '-d' must be used")
 parser.add_argument("-ss", "--single-symbol", nargs=1, help="[OPTIONAL] Specify the single-line comment symbol. By default, the comments are identified via file extension itself, Note that if this flag is specified with the directory flag, then all files within that directory are checked against this comment symbol")
 parser.add_argument("-ms", "--multiline-symbol", nargs=1, help="[OPTIONAL] Specify the multi-line comment symbols as a space-separated pair of opening and closing symbols. Behaves similiar to single-line comments")
