@@ -14,7 +14,8 @@ parser: argparse.ArgumentParser = argparse.ArgumentParser(description="A simple 
 parser.add_argument("-v", "--version", help="Current version of cloc", action="store_true")
 parser.add_argument("-d", "--dir", nargs=1, help="Specify the directory to scan. Either this or '-d' must be used")
 parser.add_argument("-f", "--file", nargs=1, help="Specify the file to scan. Either this or '-d' must be used")
-parser.add_argument("-cs", "--comment-symbol", nargs="+", help="[OPTIONAL] Specify the comment symbols. By default, the comments are identified via file extension itself, Note that if this flag is specified with the directory flag, then all files within that directory are checked against this comment symbol")
+parser.add_argument("-ss", "--single-symbol", nargs=1, help="[OPTIONAL] Specify the single-line comment symbol. By default, the comments are identified via file extension itself, Note that if this flag is specified with the directory flag, then all files within that directory are checked against this comment symbol")
+parser.add_argument("-ms", "--multiline-symbol", nargs=1, help="[OPTIONAL] Specify the multi-line comment symbols as a space-separated pair of opening and closing symbols. Behaves similiar to single-line comments")
 parser.add_argument("-xf", "--exclude-file", nargs="+", help="[OPTIONAL] Exclude files by name")
 parser.add_argument("-xd", "--exclude-dir", nargs="+", help="[OPTIONAL] Exclude directories by name")
 parser.add_argument("-xt", "--exclude-type", nargs="+", help="[OPTIONAL] Exclude files by extension")
@@ -39,11 +40,18 @@ if __name__ == "__main__":
         args.file = args.file[0]    # Fetch first (and only) entry from list since `nargs` param in parser.add_argument returns the args as a list
         bIsFile = True
 
-    if args.comment_symbol:
-        symbolData: frozenset = frozenset(*args.comment_symbol)
-    else:
-        symbolData = None
+    symbolData: dict = {}
+    if args.single_symbol:
+        symbolData["single"] = args.single_symbol[0].strip().encode()
+    if args.multiline_symbol:
+        pairing = args.multiline_symbol[0].strip().split(" ")
+        if len(pairing) != 2:
+            print(f"ERROR: Multiline symbols f{args.multiline_symbol[0]} must be space-separated pair, such as '/* */'")
+            exit(500)
+        symbolData["multistart"] = pairing[0].encode()
+        symbolData['multiend'] = pairing[1].encode()
 
+    print(symbolData)
     # Single file, no need to check and validate other flags
     if bIsFile:     
         if not os.path.exists(args.file):
@@ -54,9 +62,9 @@ if __name__ == "__main__":
             exit(500)
 
         # Fetch comment symbols if not specified via -cs
+        singleLine, multiLineStart, multiLineEnd = None, None, None
         if not symbolData:
             symbolData = findCommentSymbols(args.file.split(".")[-1])
-            singleLine, multiLineStart, multiLineEnd = None, None, None
             if isinstance(symbolData, bytes):
                 # Single line only
                 singleLine: bytes = symbolData
@@ -69,6 +77,10 @@ if __name__ == "__main__":
                 singleLine: bytes = symbolData[0]
                 multiLineStart: bytes = symbolData[1][0]
                 multiLineEnd: bytes = symbolData[1][1]
+        else:
+            singleLine = symbolData.get("single")
+            multiLineStart = symbolData.get("multistart")
+            multiLineEnd = symbolData.get("multiend")
 
         loc, total = parseFile(args.file, singleLine, multiLineStart, multiLineEnd)
         outputMapping: MappingProxyType = MappingProxyType({"loc" : loc, "total" : total, "time" : datetime.now().strftime("%d/%m/%y, at %H:%M:%S"), "platform" : platform.system()})
@@ -145,11 +157,11 @@ if __name__ == "__main__":
     root_data = os.walk(root)
 
     if args.verbose:
-        outputMapping = parseDirectory(root_data, fileFilter, directoryFilter, args.recurse)
+        outputMapping = parseDirectory(root_data, symbolData, fileFilter, directoryFilter, args.recurse)
         outputMapping["general"]["time"] = datetime.now().strftime("%d/%m/%y, at %H:%M:%S")
         outputMapping["general"]["platform"] = platform.system()
     else:
-        outputMapping = parseDirectoryNoVerbose(root_data, fileFilter, directoryFilter, args.recurse)
+        outputMapping = parseDirectoryNoVerbose(root_data, symbolData, fileFilter, directoryFilter, args.recurse)
         outputMapping["time"] = datetime.now().strftime("%d/%m/%y, at %H:%M:%S")
         outputMapping["platform"] = platform.system()
 

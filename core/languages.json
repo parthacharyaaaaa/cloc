@@ -111,7 +111,7 @@
         "twig": "{# #}",
         "jinja": "{# #}",
         "tpl": "{* *}",
-        "liquid": "{% comment %} {% endcomment %}",
+        "liquid": "{%comment%} {%endcomment%}",
         "cfm": "<!--- --->",
         "applescript": "(* *)",
         "ls": "/* */",
