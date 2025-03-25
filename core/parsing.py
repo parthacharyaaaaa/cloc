@@ -5,24 +5,22 @@ from utils import findCommentSymbols
 
 def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStartSymbol: str | None = None, multiLineEndSymbol: str | None = None) -> tuple[int, int]:
     loc: int = 0
-    currentLine: int = 0
+    total: int = 0
     singleCommentSymbolLength: int = 0 if not singleCommentSymbol else len(singleCommentSymbol)
     multiCommentStartSymbolLength: int = 0 if not multiLineStartSymbol else len(multiLineStartSymbol)
     multiCommentEndSymbolLength: int = 0 if not multiLineEndSymbol else len(multiLineEndSymbol)
     with open(filepath, 'rb') as file:
         commentedBlock: bool = False            # Multiple multilineStarts will still have the same effect as one, so a single flag is enough
-        for line in file:
+        for total, line in enumerate(file, start=1):
             line: bytes = line.strip()
 
             # Deal with empty lines, irrespective of whether they are in a commented block or not
             if not line:
-                currentLine+=1
                 continue
 
             # Firstly, deal with single line comments if the language supports it (Looking at you, HTML, even if I don't consider you a language)
             if singleCommentSymbol and line[:singleCommentSymbolLength] == singleCommentSymbol:
                 # Line is commented, increment line counter and continue
-                currentLine+=1
                 continue
 
             # Deal with multiline comments, if the language supports it
@@ -44,24 +42,19 @@ def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStartSym
                         break
                     elif not commentedBlock:
                         validLine = True
-
                     idx += 1
-                
                 if validLine:
                     loc+=1
             else:
                 # Multiline logic ended, and check for single line symbol at start of the line has yielded False
                 loc+=1
 
-            currentLine+=1
-
-        return loc, currentLine
+        return loc, total
      
 def parseDirectoryNoVerbose(dirData: Iterator[tuple[Any, list[Any], list[Any]]], customSymbols: dict = None, fileFilterFunction: Callable = lambda outputMapping: True, directoryFilterFunction: Callable = lambda outputMapping : False, recurse:bool = False, level:int = 0, loc: int = 0, totalLines: int = 0, outputMapping: dict = None) -> dict[str, str | int]:
     materialisedDirData: list = list(dirData)
     rootDirectory: os.PathLike = materialisedDirData[0][0]
 
-    print("Scanning dir: ", rootDirectory, level)
     if not outputMapping:
         outputMapping = {"loc" : 0, "total" : 0}
 
