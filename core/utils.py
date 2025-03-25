@@ -46,6 +46,11 @@ def dumpOutputSTD(outputMapping: dict, fpath: os.PathLike) -> None:
     with open(fpath, "w+") as file:
         mainMetadata: str = "\n".join(tuple(f"{k} : {v}" for k,v in outputMapping.pop("general").items()))
         file.write(mainMetadata)
+        file.write("\n"+"="*15+"\n")
+        outputString: str = ""
+        for directory, entries in outputMapping.items():
+            outputString = "\n".join(f"\t{k}:LOC: {v['loc']} Total: {v['total_lines']}" for k,v in entries.items())
+            file.write(f"{directory}\n{outputString}\n")
 
 def dumpOutputJSON(outputMapping: dict, fpath: os.PathLike) -> None:
     '''Dump output to JSON file, with proper formatting'''

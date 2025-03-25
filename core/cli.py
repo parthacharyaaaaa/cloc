@@ -164,6 +164,7 @@ if __name__ == "__main__":
         outputMapping["time"] = datetime.now().strftime("%d/%m/%y, at %H:%M:%S")
         outputMapping["platform"] = platform.system()
 
+    print("=================== SCAN COMPLETE ====================")
     if args.output:
         outputFiletype: str = args.output[0].split(".")[-1].lower()
 
