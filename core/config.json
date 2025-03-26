@@ -1,7 +1,8 @@
 {
     "version" : 0.1,
-    "flags" : {
+    "defaults" : {
         "recurse" : false,
-        "verbose" : true
+        "verbose" : true,
+        "min_chars" : 0
     }
 }

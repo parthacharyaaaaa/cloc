@@ -7,13 +7,14 @@ from types import MappingProxyType
 from parsing import parseDirectory, parseDirectoryNoVerbose, parseFile
 from datetime import datetime
 import platform
-from config import FLAGS
+from config import DEFAULTS
 
 parser: argparse.ArgumentParser = argparse.ArgumentParser(description="A simple CLI tool to count lines of code (LOC) of your files")
 
 parser.add_argument("-v", "--version", help="Current version of cloc", action="store_true")
 parser.add_argument("-d", "--dir", nargs=1, help="Specify the directory to scan. Either this or '-f' must be used")
 parser.add_argument("-f", "--file", nargs=1, help="Specify the file to scan. Either this or '-d' must be used")
+parser.add_argument("-mc", "--min-chars", nargs=1, type=int, help="[OPTIONAL] Specify the minimum number of non-whitespace characters a line should have to be considered an LOC", default=DEFAULTS.min_chars)
 parser.add_argument("-ss", "--single-symbol", nargs=1, help="[OPTIONAL] Specify the single-line comment symbol. By default, the comments are identified via file extension itself, Note that if this flag is specified with the directory flag, then all files within that directory are checked against this comment symbol")
 parser.add_argument("-ms", "--multiline-symbol", nargs=1, help="[OPTIONAL] Specify the multi-line comment symbols as a space-separated pair of opening and closing symbols. Behaves similiar to single-line comments")
 parser.add_argument("-xf", "--exclude-file", nargs="+", help="[OPTIONAL] Exclude files by name")
@@ -22,9 +23,9 @@ parser.add_argument("-xt", "--exclude-type", nargs="+", help="[OPTIONAL] Exclude
 parser.add_argument("-id", "--include-dir", nargs="+", help="[OPTIONAL] Include directories by name")
 parser.add_argument("-if", "--include-file", nargs="+", help="[OPTIONAL] Include files by name")
 parser.add_argument("-it", "--include-type", nargs="+", help="[OPTIONAL] Include files by extension, useful for specificity when working with directories with files for different languages")
-parser.add_argument("-vb", "--verbose", help="Get LOC and total lines for every file scanned", action="store_true", default=FLAGS.verbose)
+parser.add_argument("-vb", "--verbose", help="Get LOC and total lines for every file scanned", action="store_true", default=DEFAULTS.verbose)
 parser.add_argument("-o", "--output", nargs=1, help="[OPTIONAL] Specify output file to dump counts into. If not specified, output is dumped to stdout. If output file is in .json, .toml, .yaml, or .db/.sql format, then output is ordered differently.")
-parser.add_argument("-r", "--recurse", help="[OPTIONAL] Recursively scan every sub-directory too", action="store_true", default=FLAGS.recurse)
+parser.add_argument("-r", "--recurse", help="[OPTIONAL] Recursively scan every sub-directory too", action="store_true", default=DEFAULTS.recurse)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -55,7 +56,7 @@ if __name__ == "__main__":
         symbolData["multistart"] = pairing[0].encode()
         symbolData['multiend'] = pairing[1].encode()
 
-    # Single file, no need to check and validate other flags
+    # Single file, no need to check and validate other DEFAULTS
     if bIsFile:     
         if not os.path.exists(args.file):
             print(f"ERROR: {args.file} not found")       
@@ -85,7 +86,12 @@ if __name__ == "__main__":
             multiLineStart = symbolData.get("multistart")
             multiLineEnd = symbolData.get("multiend")
 
-        loc, total = parseFile(args.file, singleLine, multiLineStart, multiLineEnd)
+        
+        loc, total = parseFile(filepath=args.file, 
+                               singleCommentSymbol=singleLine, 
+                               multiLineStartSymbol=multiLineStart, 
+                               multiLineEndSymbol=multiLineEnd, 
+                               minChars=args.min_chars if isinstance(args.min_chars, int) else args.min_chars[0])
         outputMapping: MappingProxyType = MappingProxyType({"loc" : loc, "total" : total, "time" : datetime.now().strftime("%d/%m/%y, at %H:%M:%S"), "platform" : platform.system()})
         if not args.output:
             print(outputMapping)
@@ -160,11 +166,23 @@ if __name__ == "__main__":
     root_data = os.walk(root)
 
     if args.verbose:
-        outputMapping = parseDirectory(root_data, symbolData, fileFilter, directoryFilter, args.recurse)
+        outputMapping = parseDirectory(dirData=root_data,
+                                       customSymbols=symbolData,
+                                       fileFilterFunction=fileFilter,
+                                       directoryFilterFunction=directoryFilter,
+                                       minChars=args.min_chars if isinstance(args.min_chars, 0) else args.min_chars[0],
+                                       recurse=args.recurse)
+        
         outputMapping["general"]["time"] = datetime.now().strftime("%d/%m/%y, at %H:%M:%S")
         outputMapping["general"]["platform"] = platform.system()
     else:
-        outputMapping = parseDirectoryNoVerbose(root_data, symbolData, fileFilter, directoryFilter, args.recurse)
+        outputMapping = parseDirectoryNoVerbose(dirData=root_data,
+                                                customSymbols=symbolData,
+                                                fileFilterFunction=fileFilter,
+                                                directoryFilterFunction=directoryFilter,
+                                                minChars=args.min_chars if isinstance(args.min_chars, 0) else args.min_chars[0],
+                                                recurse=args.recurse)
+        
         outputMapping["time"] = datetime.now().strftime("%d/%m/%y, at %H:%M:%S")
         outputMapping["platform"] = platform.system()
 

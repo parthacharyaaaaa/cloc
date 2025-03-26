@@ -7,4 +7,4 @@ with open(os.path.join(os.path.dirname(__file__), "languages.json"), 'rb') as la
     LANGUAGES: MappingProxyType = MappingProxyType(json.loads(lang.read()))
 
 with open(os.path.join(os.path.dirname(__file__), "config.json"), "rb") as config:
-    FLAGS: SimpleNamespace = SimpleNamespace(**{flag: default for flag, default in json.loads(config.read())['flags'].items()})
+    DEFAULTS: SimpleNamespace = SimpleNamespace(**{flag: default for flag, default in json.loads(config.read())['defaults'].items()})

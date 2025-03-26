@@ -20,6 +20,7 @@ def findCommentSymbols(extension: str, symbolMapping: dict[str, dict[str, str]] 
         extension: File extension of the language\n
         symbolMapping: Mapping of file extensions and their corresponding symbols. Keys are `symbols` for single-line comments and `multilined` for multi-line comments. See `languages.json` for the actual mapping'''
 
+        extension = extension.lower()
         if not symbolMapping:
             symbolMapping = LANGUAGES
 
