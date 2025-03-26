@@ -42,7 +42,11 @@ def findCommentSymbols(extension: str, symbolMapping: dict[str, dict[str, str]] 
 def dumpOutputSTD(outputMapping: dict, fpath: os.PathLike) -> None:
     '''Dump output to a standard text/log file'''
     with open(fpath, "w+") as file:
-        mainMetadata: str = "\n".join(tuple(f"{k} : {v}" for k,v in outputMapping.pop("general").items()))
+        if not outputMapping.get("general"):
+            file.write("\n".join(f"{k} : {v}" for k,v in outputMapping.items()))
+            return
+        
+        mainMetadata: str = "\n".join(f"{k} : {v}" for k,v in outputMapping.pop("general").items())
         file.write(mainMetadata)
         file.write("\n"+"="*15+"\n")
         outputString: str = ""
