@@ -1,9 +1,16 @@
 '''Helper functions'''
 from types import MappingProxyType
-import json
 import xml.etree.ElementTree as ETree
 import os
 from config import LANGUAGES
+
+# Dynamic import in case orjson is found in the Python environment (vroom vroom)
+bOrjson: bool = True
+try:
+    import orjson
+except:
+    bOrjson = False
+    import json
 
 def getVersion():
     with open(os.path.join(os.path.dirname(__file__), "config.json")) as config:
@@ -57,11 +64,16 @@ def dumpOutputSTD(outputMapping: dict, fpath: os.PathLike) -> None:
 
 def dumpOutputJSON(outputMapping: dict, fpath: os.PathLike) -> None:
     '''Dump output to JSON file, with proper formatting'''
+    if bOrjson:
+        with open(os.path.join(os.getcwd(), fpath), "wb+") as dumpFile:
+            dumpFile.write(orjson.dumps(outputMapping, option=orjson.OPT_INDENT_2, default=dict))
+        return
+
     with open(os.path.join(os.getcwd(), fpath), "w+") as dumpFile:
         dumpFile.write(json.dumps(outputMapping, skipkeys=True,
-                                  ensure_ascii=True,
-                                  indent="\t",
-                                  default=dict))
+                                ensure_ascii=True,
+                                indent="\t",
+                                default=dict))
 
 def dumpOutputSQL(outputMapping: dict, fpath: os.PathLike) -> None:
     '''Dump output to a SQLite database (.db, .sql)'''

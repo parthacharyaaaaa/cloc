@@ -8,6 +8,7 @@ from parsing import parseDirectory, parseDirectoryNoVerbose, parseFile
 from datetime import datetime
 import platform
 from config import DEFAULTS
+from time import time
 
 parser: argparse.ArgumentParser = argparse.ArgumentParser(description="A simple CLI tool to count lines of code (LOC) of your files")
 
@@ -65,6 +66,7 @@ if __name__ == "__main__":
             print(f"ERROR: {args.file} is not a valid file")
             exit(500)
 
+        epoch = time()
         # Fetch comment symbols if not specified via -cs
         singleLine, multiLineStart, multiLineEnd = None, None, None
         if not symbolData:
@@ -92,7 +94,7 @@ if __name__ == "__main__":
                                multiLineStartSymbol=multiLineStart, 
                                multiLineEndSymbol=multiLineEnd, 
                                minChars=args.min_chars if isinstance(args.min_chars, int) else args.min_chars[0])
-        outputMapping: MappingProxyType = MappingProxyType({"loc" : loc, "total" : total, "time" : datetime.now().strftime("%d/%m/%y, at %H:%M:%S"), "platform" : platform.system()})
+        outputMapping: MappingProxyType = MappingProxyType({"loc" : loc, "total" : total, "time" : f"{time()-epoch:.3f}s", "scanned at" : datetime.now().strftime("%d/%m/%y, at %H:%M:%S"), "platform" : platform.system()})
         if not args.output:
             print(outputMapping)
         else:
@@ -165,26 +167,29 @@ if __name__ == "__main__":
     root: os.PathLike = os.path.abspath(args.dir)
     root_data = os.walk(root)
 
+    epoch = time()
     if args.verbose:
         outputMapping = parseDirectory(dirData=root_data,
                                        customSymbols=symbolData,
                                        fileFilterFunction=fileFilter,
                                        directoryFilterFunction=directoryFilter,
-                                       minChars=args.min_chars if isinstance(args.min_chars, 0) else args.min_chars[0],
+                                       minChars=args.min_chars if isinstance(args.min_chars, int) else args.min_chars[0],
                                        recurse=args.recurse)
         
-        outputMapping["general"]["time"] = datetime.now().strftime("%d/%m/%y, at %H:%M:%S")
+        outputMapping["general"]["time"] = f"{time()-epoch:.3f}s"
+        outputMapping["general"]["scanned at"] = datetime.now().strftime("%d/%m/%y, at %H:%M:%S")
         outputMapping["general"]["platform"] = platform.system()
     else:
         outputMapping = parseDirectoryNoVerbose(dirData=root_data,
                                                 customSymbols=symbolData,
                                                 fileFilterFunction=fileFilter,
                                                 directoryFilterFunction=directoryFilter,
-                                                minChars=args.min_chars if isinstance(args.min_chars, 0) else args.min_chars[0],
+                                                minChars=args.min_chars if isinstance(args.min_chars, int) else args.min_chars[0],
                                                 recurse=args.recurse)
         
-        outputMapping["time"] = datetime.now().strftime("%d/%m/%y, at %H:%M:%S")
-        outputMapping["platform"] = platform.system()
+        outputMapping["general"]["time"] = f"{time()-epoch:.3f}s"
+        outputMapping["general"]["scanned at"] = datetime.now().strftime("%d/%m/%y, at %H:%M:%S")
+        outputMapping["general"]["platform"] = platform.system()
 
     print("=================== SCAN COMPLETE ====================")
     if args.output:
