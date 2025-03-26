@@ -5,6 +5,14 @@ import xml.etree.ElementTree as ETree
 import os
 from config import LANGUAGES
 
+def getVersion():
+    with open(os.path.join(os.path.dirname(__file__), "config.json")) as config:
+        version: str = json.loads(config.read()).get("version")
+        if not version:
+            print("py-cloc: version not found!")
+        else:
+            print("py-cloc", version)
+
 def findCommentSymbols(extension: str, symbolMapping: dict[str, dict[str, str]] | None = None) -> bytes | tuple[bytes, bytes] | tuple[bytes, tuple[bytes, bytes]]:
         '''### Find symbols that denote a comment for a specific language
         

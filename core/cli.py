@@ -1,6 +1,6 @@
 import argparse
 import os
-from utils import findCommentSymbols
+from utils import findCommentSymbols, getVersion
 from utils import OUTPUT_MAPPING
 from typing import Callable
 from types import MappingProxyType
@@ -28,6 +28,10 @@ parser.add_argument("-r", "--recurse", help="[OPTIONAL] Recursively scan every s
 
 if __name__ == "__main__":
     args = parser.parse_args()
+
+    if args.version:
+        getVersion()
+        exit(200)
 
     bCustomSymbols: bool = False
     bIsFile: bool = False
