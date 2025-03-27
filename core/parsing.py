@@ -28,13 +28,13 @@ def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStartSym
   
 
 def parseDirectoryNoVerbose(dirData: Iterator[tuple[Any, list[Any], list[Any]]], customSymbols: dict = None, fileFilterFunction: Callable = lambda outputMapping: True, directoryFilterFunction: Callable = lambda outputMapping : False, minChars:int = 0, recurse:bool = False, level:int = 0, loc: int = 0, totalLines: int = 0, outputMapping: dict = None) -> dict[str, str | int]:
-    materialisedDirData: list = list(dirData)
-    rootDirectory: os.PathLike = materialisedDirData[0][0]
+    materialisedDirData: list[os.PathLike] = next(dirData)
+    rootDirectory: os.PathLike = materialisedDirData[0]
 
     if not outputMapping:
         outputMapping = {"loc" : 0, "total" : 0}
 
-    for file in materialisedDirData[0][2]:
+    for file in materialisedDirData[2]:
         # File excluded
         if not fileFilterFunction(file):
             continue
@@ -66,7 +66,7 @@ def parseDirectoryNoVerbose(dirData: Iterator[tuple[Any, list[Any], list[Any]]],
         return outputMapping
 
     # All files have been parsed in this directory, recurse
-    for dir in materialisedDirData[0][1]:
+    for dir in materialisedDirData[1]:
         if not directoryFilterFunction(dir):
             continue
         # Walk over and parse subdirectory
