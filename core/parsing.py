@@ -93,12 +93,12 @@ def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], customSy
     '''
     ...
     # TODO: Remove complete materialisation of dirData
-    materialisedDirData: list = list(dirData)
-    rootDirectory: os.PathLike = materialisedDirData[0][0]
+    materialisedDirData: list = next(dirData)
+    rootDirectory: os.PathLike = materialisedDirData[0]
 
     if not outputMapping:
         outputMapping = {"general" : {}}
-    for file in materialisedDirData[0][2]:
+    for file in materialisedDirData[2]:
         # File excluded
         if not fileFilterFunction(file):
             continue
@@ -130,7 +130,7 @@ def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], customSy
         return outputMapping
 
     # All files have been parsed in this directory, recurse
-    for dir in materialisedDirData[0][1]:
+    for dir in materialisedDirData[1]:
         if not directoryFilterFunction(dir):
             print("Skipping directory:", dir)
             continue
