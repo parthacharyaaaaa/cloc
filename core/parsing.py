@@ -2,7 +2,9 @@
 import os
 from typing import Any, Callable, Iterator
 from utils import findCommentSymbols
-from ctypes_interfacing import lib, LineScanResult
+from ctypes_interfacing import lib, BatchScanResult
+from itertools import islice
+import ctypes
 
 def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStartSymbol: str | None = None, multiLineEndSymbol: str | None = None, minChars: int = 0) -> tuple[int, int]:
     loc: int = 0
@@ -12,12 +14,16 @@ def parseFile(filepath: os.PathLike, singleCommentSymbol: str, multiLineStartSym
     multiCommentEndSymbolLength: int = 0 if not multiLineEndSymbol else len(multiLineEndSymbol)
     with open(filepath, 'rb') as file:
         commentedBlock: bool = False            # Multiple multilineStarts will still have the same effect as one, so a single flag is enough
-        for total, line in enumerate(file, start = 1):
-            res: LineScanResult = lib.scanLine(line, len(line), commentedBlock, minChars, singleCommentSymbol, singleCommentSymbolLength, multiLineStartSymbol, multiCommentStartSymbolLength, multiLineEndSymbol, multiCommentEndSymbolLength)
 
-            commentedBlock = res.commentedBlock
-            if res.isValid:
-                loc+=1
+        while batch := list(islice(file, 100)):
+            batchSize = len(batch)
+            
+            batchScanResult: BatchScanResult = lib.scanBatch((ctypes.c_char_p * batchSize)(*batch), batchSize, commentedBlock, minChars, singleCommentSymbol, singleCommentSymbolLength, multiLineStartSymbol, multiCommentStartSymbolLength, multiLineEndSymbol, multiCommentEndSymbolLength)
+
+            loc += batchScanResult.validLines
+            total += batchSize
+
+            commentedBlock = batchScanResult.commentedBlock
         return loc, total
   
 
@@ -137,47 +143,5 @@ def parseDirectory(dirData: Iterator[tuple[Any, list[Any], list[Any]]], customSy
         outputMapping["general"]["total"] = outputMapping["general"]["total"] + localTotal
         outputMapping.update(op)
 
-
-    return outputMapping
-
-def parseDirectoryDeque(dir: os.PathLike, fileFilterFunction: Callable = lambda outputMapping: True, directoryFilterFunction: Callable = lambda outputMapping : False, recurse: bool = False) -> tuple[int, int] | None:
-    '''Slower, non-recursive implementation of parseDirectory'''
-    from collections import deque
-    directories: deque = deque()
-    directories.append(dir)
-    outputMapping: dict = {"general" : {"loc" : 0, "total" : 0}}
-    
-    while directories:
-        currentScanDir: os.PathLike = directories.popleft()
-        print("Scanning dir: ", currentScanDir)
-
-        try:
-            for entry in os.scandir(currentScanDir):
-                    if entry.is_dir() and directoryFilterFunction(entry.name) and recurse:  
-                            print("Adding dir:", entry)
-                            directories.append(entry.path)
-                    elif entry.is_file() and fileFilterFunction(entry.name):
-                        # File good to be parsed
-                        print("Scanning file:", entry.name)
-                        singleLine, multiLineStart, multiLineEnd = None, None, None
-                        symbolData = findCommentSymbols(entry.name.split(".")[-1])  
-
-                        if isinstance(symbolData, bytes):
-                            singleLine = symbolData
-                        elif isinstance(symbolData[1], bytes):
-                            multiLineStart, multiLineEnd = symbolData
-                        else:
-                            singleLine, (multiLineStart, multiLineEnd) = symbolData
-                        
-                        loc, total_lines = parseFile(entry.path, singleLine, multiLineStart, multiLineEnd)
-                        outputMapping["general"]["loc"] += loc
-                        outputMapping["general"]["total"] += total_lines
-                        outputMapping.setdefault(currentScanDir, {})[entry.name] = {
-                            "loc": loc, "total_lines": total_lines
-                        }
-                    else:
-                        print("skipped:", entry.name)
-        except PermissionError:
-            print(f"Skipping {currentScanDir} due to permission error.")
 
     return outputMapping
