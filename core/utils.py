@@ -1,6 +1,6 @@
 '''Helper functions'''
 from types import MappingProxyType
-import xml.etree.ElementTree as ETree
+import csv
 import os
 from config import LANGUAGES
 
@@ -130,12 +130,31 @@ def dumpOutputSQL(outputMapping: dict, fpath: os.PathLike) -> None:
         dbConnection.close()
         dbConnection = None
 
-def dumpOutputCSV(outputMapping: dict, fpath: os.PathLike) -> None: ...
+def dumpOutputCSV(outputMapping: dict, fpath: os.PathLike) -> None:
+    with open(fpath, newline='', mode="w+") as csvFile:
+        writer = csv.writer(csvFile)
+        generalData: dict = outputMapping.get("general")
+
+        if not generalData:
+            writer.writerow(outputMapping.keys())
+            writer.writerow(outputMapping.values())
+        else:
+            generalData.pop("general")
+            writer.writerow(generalData.keys())
+            writer.writerow(generalData.values())
+            writer.writerow(())
+
+            # Write actual, per file data
+            writer.writerow(("DIRECTORY", "FILE", "LOC", "TOTAL"))
+            writer.writerow(())
+            writer.writerows((dir, filename, fileData["loc"], fileData["total_lines"]) for dir, file in outputMapping.items() for filename, fileData in file.items())
 
 OUTPUT_MAPPING: MappingProxyType = MappingProxyType({
     "json" : dumpOutputJSON,
     "db" : dumpOutputSQL,
     "sql" : dumpOutputSQL,
     "csv" : dumpOutputCSV,
+    "txt" : dumpOutputSTD,
+    "log" : dumpOutputSTD,
     None : dumpOutputSTD
 })
