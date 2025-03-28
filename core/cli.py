@@ -28,7 +28,7 @@ parser.add_argument("-vb", "--verbose", help="Get LOC and total lines for every 
 parser.add_argument("-o", "--output", nargs=1, help="[OPTIONAL] Specify output file to dump counts into. If not specified, output is dumped to stdout. If output file is in .json, .toml, .yaml, or .db/.sql format, then output is ordered differently.")
 parser.add_argument("-r", "--recurse", help="[OPTIONAL] Recursively scan every sub-directory too", action="store_true", default=DEFAULTS.recurse)
 
-if __name__ == "__main__":
+def main() -> None:
     args = parser.parse_args()
 
     if args.version:
@@ -201,3 +201,6 @@ if __name__ == "__main__":
     else:
         print(outputMapping)
         exit(200)
+
+if __name__ == "__main__":
+    main()
