@@ -1,0 +1,8 @@
+{
+    "version" : 1.0,
+    "defaults" : {
+        "recurse" : false,
+        "verbose" : true,
+        "min_chars" : 0
+    }
+}
