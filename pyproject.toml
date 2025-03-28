@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=63.1.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pycloc"
+version = "1.0.0"
+authors = [
+  { name="Parth Acharya", email="1008parth@gmail.com" }
+]
+description = "A simple CLI tool to count lines of code (LOC) of your files"
+readme = "README.md"
+requires-python = ">=3.10"
+
+classifiers = [
+    "Programming Language :: Python :: 3.10",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)"
+]
+keywords = ["pycloc", "cloc", "py-cloc", "loc"]
+
+[project.urls]
+Repository = "https://github.com/parthacharyaaaaa/cloc"
+Issues = "https://github.com/parthacharyaaaaa/cloc/issues"
+
+[project.optional-dependencies]
+orjson=["orjson"]
+
+[project.scripts]
+pycloc = "cloc.__main__:main"
+
+[tool.setuptools.package-data]
+data = ["config.json", "languages.json"]
