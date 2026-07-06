@@ -10,6 +10,7 @@ from locstat import __tool_name__
 from locstat.data_structures.config import ClocConfig
 from locstat.data_structures.parse_modes import ParseMode
 from locstat.data_structures.verbosity import Verbosity
+from locstat.utilities.core import resolve_relative_paths
 from locstat.utilities.presentation import OUTPUT_MAPPING, dump_std_output
 
 __all__ = ("initialize_parser", "parse_arguments")
@@ -260,11 +261,11 @@ def initialize_parser(config: ClocConfig) -> argparse.ArgumentParser:
     )
 
     dir_filter_group.add_argument(
-        "-xd", "--exclude-dir", nargs="+", help="Exclude directories by name"
+        "-xd", "--exclude-dir", nargs="+", help="Exclude sub-directories by name"
     )
 
     dir_filter_group.add_argument(
-        "-id", "--include-dir", nargs="+", help="Include directories by name"
+        "-id", "--include-dir", nargs="+", help="Include sub-directories by name"
     )
 
     type_filter_group: argparse._MutuallyExclusiveGroup = (
@@ -349,5 +350,36 @@ def parse_arguments(
         (parsed_arguments.config[i], parsed_arguments.config[i + 1])
         for i in range(0, configurations_args_length - 1, 2)
     ]
+
+    # Resolve file and directory paths relative to target directory
+    if parsed_arguments.dir:
+        for path_attribute in [
+            "exclude_file",
+            "include_file",
+            "exclude_dir",
+            "include_dir",
+        ]:
+            if paths := getattr(parsed_arguments, path_attribute, None):
+                resolved_paths: list[str] = resolve_relative_paths(
+                    parsed_arguments.dir, paths
+                )
+                setattr(parsed_arguments, path_attribute, resolved_paths)
+
+        for path_attribute in ["include_file", "include_dir"]:
+            missing_paths: list[str] = [
+                path
+                for path in getattr(parsed_arguments, path_attribute, []) or []
+                if not os.path.exists(path)
+            ]
+            if missing_paths:
+                raise SystemExit(
+                    " ".join(
+                        (
+                            f"Inclusion path{'s' if len(missing_paths) > 1 else ''}",
+                            "specified but missing:",
+                            ", ".join(missing_paths),
+                        )
+                    )
+                )
 
     return parsed_arguments

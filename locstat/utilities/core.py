@@ -1,4 +1,5 @@
-from typing import Callable, Optional
+from pathlib import Path
+from typing import Callable, Iterable, Optional
 
 from locstat.data_structures.parse_modes import ParseMode
 from locstat.data_structures.typing import SupportsMembershipChecks, FileParsingFunction
@@ -64,3 +65,15 @@ def derive_file_parser(option: ParseMode) -> FileParsingFunction:
     elif option == ParseMode.COMPLETE:
         return _parse_file_no_chunk
     return _parse_file
+
+
+def resolve_relative_paths(parent_directory: str, paths: Iterable[str]) -> list[str]:
+    parent_path: Path = Path(parent_directory)
+    return [
+        (
+            str((parent_path / path).resolve()).rstrip("\\/")
+            if not Path(path).is_absolute()
+            else path.rstrip("\\/")
+        )
+        for path in paths
+    ]
