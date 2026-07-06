@@ -48,14 +48,19 @@ def construct_file_filter(
 
 
 def construct_directory_filter(
-    directories: SupportsMembershipChecks[str],
+    directories: Iterable[str],
     exclude: bool = False,
     include: bool = False,
 ) -> Callable[[str], bool]:
+    directory_paths: frozenset[Path] = frozenset(Path(d) for d in directories)
+    if include:
+        return lambda directory: (
+            (path := Path(directory)) in directory_paths
+            or any(inc in path.parents for inc in directory_paths)
+        )
+
     if exclude:
-        return lambda directory: directory not in directories
-    elif include:
-        return lambda directory: directory in directories
+        return lambda directory: Path(directory) not in directory_paths
     return lambda directory: True
 
 
