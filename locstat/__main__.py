@@ -119,8 +119,15 @@ def main() -> int:
                 exclude=bool(args.exclude_dir),
             )
 
+        try:
+            scandir_iterator: os._ScandirIterator = os.scandir(
+                os.path.abspath(args.dir)
+            )
+        except PermissionError:
+            raise SystemExit(f"Insufficient permissions to scan {args.dir}")
+
         kwargs: dict[str, Any] = {
-            "directory_data": os.scandir(os.path.abspath(args.dir)),
+            "directory_data": scandir_iterator,
             "config": config,
             "file_parsing_function": file_parser_function,
             "file_filter_function": file_filter,
