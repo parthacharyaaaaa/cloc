@@ -1,5 +1,5 @@
 # locstat
-## Get source code line statistics
+## Get LoC statistics, fast.
 
 * [Installation](#installation)
 * [Usage](#usage)
@@ -25,7 +25,7 @@ $ pip install locstat
 locstat is designed to be a CLI tool, invocable as the package name itself.
 
 ```bash
-$ locstat [-h] (-v VERSION | -c CONFIG | -f FILE | -d DIR) [options]
+$ locstat [-h] (-v VERSION | -f FILE | -d DIR | -c CONFIG | -clm COPY_LANGUAGE_METADATA | -rc RESTORE_CONFIG) [options]
 ```
 
 ### Primary Action
@@ -41,7 +41,7 @@ A primary action must be specified when invoking the tool through the command li
 * **-f/--file**: Filepath to parse
 * **-d/--dir**: Directory to parse
 
-Note: These options are **mutually exclusive**
+**Note**: These options are **mutually exclusive**
 
 ### Parsing Filters
 ---
@@ -58,6 +58,37 @@ Note: These options are **mutually exclusive**
 **-xt/--exclude-type**: File extensions following this flag will be ignored.
 
 **-it/--include-type**: Only file extensions following this flag will be parsed.
+
+#### Path Resolution
+Assume a directory structure as follows:
+```bash
+├── locstat
+│   ├── data_structures
+│   ├── parsing
+│   │   └── extensions
+│   └── utilities
+└── tests
+    ├── integrity
+    └── unit
+```
+Furthermore, lets assume that our CWD is `../locstat`, i.e. a level above the structure.
+
+Here, suppose we wish to exclude the nested `extensions` directory from our scans (-xd flag). Locstat provides 3 ways of achieving this:
+
+1. **Absolute**
+```bash
+$ locstat -d locstat -xd /home/foo/projects/locstat/tests
+```
+
+2. **Relative**
+```bash
+$ locstat -d locstat -xd locstat/tests
+```
+
+3. **Implicitly Relative**
+```bash
+$ locstat -d locstat -xd tests
+```
 
 ### Finer Parsing Controls
 ---

@@ -19,6 +19,7 @@ from locstat.parsing.directory import (
     parse_directory_record,
     parse_directory_verbose,
 )
+from locstat.parsing.file import file_parsing_wrapper
 from locstat.utilities.core import (
     construct_directory_filter,
     construct_file_filter,
@@ -75,8 +76,10 @@ def main() -> int:
             args.file.rsplit(".", 1)[-1], (None, None, None)
         )
         singleline_symbol, multiline_start_symbol, multiline_end_symbol = comment_data
-        epoch: float = time.time()
-        total, loc, commented_lines, blank = file_parser_function(
+        epoch: float = time.perf_counter()
+
+        total, loc, commented_lines, blank = file_parsing_wrapper(
+            file_parser_function,
             args.file,
             singleline_symbol,
             multiline_start_symbol,
@@ -119,12 +122,21 @@ def main() -> int:
                 exclude=bool(args.exclude_dir),
             )
 
+        try:
+            scandir_iterator: os._ScandirIterator = os.scandir(
+                os.path.abspath(args.dir)
+            )
+        except PermissionError:
+            raise SystemExit(f"Insufficient permissions to scan {args.dir}")
+
         kwargs: dict[str, Any] = {
-            "directory_data": os.scandir(os.path.abspath(args.dir)),
+            "directory_data": scandir_iterator,
             "config": config,
             "file_parsing_function": file_parser_function,
             "file_filter_function": file_filter,
             "directory_filter_function": directory_filter,
+            "forbidden_files": [],
+            "forbidden_directories": [],
             "minimum_characters": args.min_chars,
             "depth": args.max_depth,
         }
@@ -162,6 +174,14 @@ def main() -> int:
                 }
 
             output_mapping[OutputKeys.LANGUAGES] = language_record
+        if kwargs["forbidden_files"]:
+            output_mapping[OutputKeys.GENERAL][OutputKeys.FORBIDDEN_FILES] = (
+                "\n" + "\n".join(kwargs["forbidden_files"])
+            )
+        if kwargs["forbidden_directories"]:
+            output_mapping[OutputKeys.GENERAL][OutputKeys.FORBIDDEN_DIRECTORIES] = (
+                "\n" + "\n".join(kwargs["forbidden_directories"])
+            )
 
     general_metadata: dict[str, str] = {
         OutputKeys.TIME: f"{time.perf_counter()-epoch:.3f}s",

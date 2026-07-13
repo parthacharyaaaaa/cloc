@@ -1,4 +1,5 @@
-from typing import Callable, Optional
+from pathlib import Path
+from typing import Callable, Iterable, Optional
 
 from locstat.data_structures.parse_modes import ParseMode
 from locstat.data_structures.typing import SupportsMembershipChecks, FileParsingFunction
@@ -47,14 +48,19 @@ def construct_file_filter(
 
 
 def construct_directory_filter(
-    directories: SupportsMembershipChecks[str],
+    directories: Iterable[str],
     exclude: bool = False,
     include: bool = False,
 ) -> Callable[[str], bool]:
+    directory_paths: frozenset[Path] = frozenset(Path(d) for d in directories)
+    if include:
+        return lambda directory: (
+            (path := Path(directory)) in directory_paths
+            or any(inc in path.parents for inc in directory_paths)
+        )
+
     if exclude:
-        return lambda directory: directory not in directories
-    elif include:
-        return lambda directory: directory in directories
+        return lambda directory: Path(directory) not in directory_paths
     return lambda directory: True
 
 
@@ -64,3 +70,20 @@ def derive_file_parser(option: ParseMode) -> FileParsingFunction:
     elif option == ParseMode.COMPLETE:
         return _parse_file_no_chunk
     return _parse_file
+
+
+def resolve_relative_paths(parent_directory: str, paths: Iterable[str]) -> list[str]:
+    parent_path: Path = Path(parent_directory)
+    resolved_paths: list[str] = []
+    for str_path in paths:
+        path = Path(str_path)
+        if path.is_absolute():
+            resolved_paths.append(str(path))
+        # For !absolute paths, they are either specified as
+        # parent/dir (relative) or simply dir (implicitly relative)
+        elif path.parent == parent_path:
+            resolved_paths.append(str(path.resolve()))
+        else:
+            resolved_paths.append(str((parent_path / path).resolve()))
+
+    return [resolved_path.rstrip("\\/") for resolved_path in resolved_paths]

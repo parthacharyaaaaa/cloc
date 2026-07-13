@@ -33,22 +33,30 @@ def test_exclusive_groups(mock_config, mock_dir) -> None:
 def test_allowed_combinations(mock_config, mock_dir):
     parser: argparse.ArgumentParser = initialize_parser(mock_config)
 
+    temp_files: list[str] = ["foo.py", "bar.py"]
+    temp_subdirs: list[str] = ["foo", "bar"]
+    for temp_file in temp_files:
+        (mock_dir / temp_file).touch()
+    for temp_subdir in temp_subdirs:
+        (mock_dir / temp_subdir).mkdir()
+
     legal_args: tuple[str, ...] = (
         "-it py cpp c",
         "-xt py cpp c",
-        "-if foo.py bar.py",
-        "-xf foo.py bar.py",
-        "-id foo bar",
-        "-xd foo bar",
+        f"-if {' '.join(temp_files)}",
+        f"-xf {' '.join(temp_files)}",
+        f"-id {' '.join(temp_subdirs)}",
+        f"-xd {' '.join(temp_subdirs)}",
     )
 
     base_args: str = f"-d {mock_dir}"
 
     for arg in legal_args:
+        cli_arg: str = " ".join((base_args, arg))
         try:
-            parse_arguments(" ".join((base_args, arg)).split(), parser)
+            parse_arguments(cli_arg.split(), parser)
         except SystemExit as e:
-            e.add_note(f"Original argument: {base_args + arg}")
+            e.add_note(f"Original argument: {cli_arg}")
             raise e
 
 
