@@ -125,6 +125,8 @@ def main() -> int:
             "file_parsing_function": file_parser_function,
             "file_filter_function": file_filter,
             "directory_filter_function": directory_filter,
+            "forbidden_files": [],
+            "forbidden_directories": [],
             "minimum_characters": args.min_chars,
             "depth": args.max_depth,
         }
@@ -162,6 +164,14 @@ def main() -> int:
                 }
 
             output_mapping[OutputKeys.LANGUAGES] = language_record
+        if kwargs["forbidden_files"]:
+            output_mapping[OutputKeys.GENERAL][OutputKeys.FORBIDDEN_FILES] = (
+                "\n" + "\n".join(kwargs["forbidden_files"])
+            )
+        if kwargs["forbidden_directories"]:
+            output_mapping[OutputKeys.GENERAL][OutputKeys.FORBIDDEN_DIRECTORIES] = (
+                "\n" + "\n".join(kwargs["forbidden_directories"])
+            )
 
     general_metadata: dict[str, str] = {
         OutputKeys.TIME: f"{time.perf_counter()-epoch:.3f}s",

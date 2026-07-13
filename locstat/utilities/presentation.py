@@ -73,6 +73,16 @@ def _dump_directory_tree(
         )
 
 
+def _sort_output_mapping(output_mapping: dict[str, Any]) -> None:
+    output_mapping[OutputKeys.GENERAL] = dict(
+        sorted(
+            output_mapping[OutputKeys.GENERAL].items(),
+            key=lambda x: x[0]
+            in (OutputKeys.FORBIDDEN_DIRECTORIES, OutputKeys.FORBIDDEN_FILES),
+        )
+    )
+
+
 def dump_std_output(
     output_mapping: dict[str, Any], filepath: Union[str, os.PathLike[str], int]
 ) -> None:
@@ -89,12 +99,13 @@ def dump_std_output(
     :type mode: Literal["w+", "a"]
     """
     assert isinstance(output_mapping[OutputKeys.GENERAL], dict)
+    _sort_output_mapping(output_mapping)
     with open(filepath, "w") as file:
         file.write(f"{OutputKeys.GENERAL.capitalize()}:\n")
         file.write(
             "\n".join(
                 f"{field.capitalize()} : {value}"
-                for field, value in output_mapping[OutputKeys.GENERAL].items()
+                for field, value in (output_mapping[OutputKeys.GENERAL]).items()
             )
         )
 
@@ -156,6 +167,7 @@ def dump_json_output(
     output_mapping: dict[str, Any], filepath: Union[str, os.PathLike[str], int]
 ) -> None:
     """Dump output to JSON file, with proper formatting"""
+    _sort_output_mapping(output_mapping)
     is_file_descriptor: bool = isinstance(filepath, int)
     if not (is_file_descriptor or os.path.abspath(filepath)):
         filepath = os.path.join(os.getcwd(), filepath)

@@ -17,3 +17,6 @@ class OutputKeys(StrEnum):
     TIME = "time"
     SCANNED_AT = "scanned"
     PLATFORM = "platform"
+
+    FORBIDDEN_FILES = "FORBIDDEN_FILES"
+    FORBIDDEN_DIRECTORIES = "FORBIDDEN_DIRECTORIES"

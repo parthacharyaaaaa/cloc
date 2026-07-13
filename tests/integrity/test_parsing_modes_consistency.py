@@ -113,6 +113,8 @@ def test_parse_mode_consistency(mock_dir, mock_config):
             result,
             -1,
             derive_file_parser(parse_mode),
+            [],
+            [],
         )
         outputs[parse_mode] = result
 

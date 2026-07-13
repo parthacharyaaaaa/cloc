@@ -5,6 +5,11 @@ from typing import Any, Callable, Iterator, Optional
 from locstat.data_structures.config import ClocConfig
 from locstat.data_structures.typing import FileParsingFunction
 from locstat.data_structures.output_keys import OutputKeys
+from locstat.parsing.file import (
+    bare_file_parsing_wrapper,
+    report_file_parsing_wrapper,
+    verbose_file_parsing_wrapper,
+)
 
 __all__ = ("parse_directory", "parse_directory_record", "parse_directory_verbose")
 
@@ -15,6 +20,8 @@ def parse_directory(
     line_data: array,
     depth: int,
     file_parsing_function: FileParsingFunction,
+    forbidden_directories: list[str],
+    forbidden_files: list[str],
     file_filter_function: Callable[[str, str], bool] = lambda filename, extension: True,
     directory_filter_function: Callable = lambda _: False,
     minimum_characters: int = 0,
@@ -32,7 +39,7 @@ def parse_directory(
     :type line_data: array.array
 
     :param file_parsing_function: Parsing function called for each file
-    :type config: FileParsingFunction
+    :type config: FileParsingFunctionWrapper
 
     :param file_filter_function: Filter function to include/exclude files
     :type file_filter_function: Callable
@@ -57,34 +64,44 @@ def parse_directory(
             if not file_filter_function(dir_entry.path, extension):
                 continue
 
-            singleLine, multi_start, multi_end = config.symbol_mapping.get(
+            single, multi_start, multi_end = config.symbol_mapping.get(
                 extension, (None, None, None)
             )
-            if not (singleLine or multi_start):
+            if not (single or multi_start):
                 continue
 
-            tl, l, c, *_ = file_parsing_function(
-                dir_entry.path, singleLine, multi_start, multi_end, minimum_characters
+            bare_file_parsing_wrapper(
+                dir_entry.path,
+                line_data,
+                file_parsing_function,
+                forbidden_files,
+                single,
+                multi_start,
+                multi_end,
+                minimum_characters,
             )
-            line_data[0] += tl
-            line_data[1] += l
-            line_data[2] += c
             continue
 
         if not depth:
             return
         if not directory_filter_function(dir_entry.path):
             continue
-        parse_directory(
-            os.scandir(dir_entry.path),
-            config,
-            line_data,
-            depth - 1,
-            file_parsing_function,
-            file_filter_function,
-            directory_filter_function,
-            minimum_characters,
-        )
+
+        try:
+            parse_directory(
+                os.scandir(dir_entry.path),
+                config,
+                line_data,
+                depth - 1,
+                file_parsing_function,
+                forbidden_directories,
+                forbidden_files,
+                file_filter_function,
+                directory_filter_function,
+                minimum_characters,
+            )
+        except PermissionError:
+            forbidden_directories.append(dir_entry.path)
 
 
 def parse_directory_record(
@@ -94,6 +111,8 @@ def parse_directory_record(
     language_record: dict[str, dict[str, int]],
     depth: int,
     file_parsing_function: FileParsingFunction,
+    forbidden_directories: list[str],
+    forbidden_files: list[str],
     file_filter_function: Callable[[str, str], bool] = lambda filename, extension: True,
     directory_filter_function: Callable = lambda _: False,
     minimum_characters: int = 0,
@@ -114,7 +133,7 @@ def parse_directory_record(
     :type language_record: dict[str, dict[str, int]]
 
     :param file_parsing_function: Parsing function called for each file
-    :type config: FileParsingFunction
+    :type config: FileParsingFunctionWrapper
 
     :param file_filter_function: Filter function to include/exclude files
     :type file_filter_function: Callable
@@ -139,10 +158,10 @@ def parse_directory_record(
             if not file_filter_function(dir_entry.path, extension):
                 continue
 
-            singleLine, multi_start, multi_end = config.symbol_mapping.get(
+            single, multi_start, multi_end = config.symbol_mapping.get(
                 extension, (None, None, None)
             )
-            if not (singleLine or multi_start):
+            if not (single or multi_start):
                 continue
 
             language_record.setdefault(
@@ -154,17 +173,18 @@ def parse_directory_record(
                     OutputKeys.FILES: 0,
                 },
             )
-            tl, l, c, *_ = file_parsing_function(
-                dir_entry.path, singleLine, multi_start, multi_end, minimum_characters
+            report_file_parsing_wrapper(
+                dir_entry.path,
+                extension,
+                line_data,
+                language_record,
+                file_parsing_function,
+                forbidden_files,
+                single,
+                multi_start,
+                multi_end,
+                minimum_characters,
             )
-            line_data[0] += tl
-            line_data[1] += l
-            line_data[2] += c
-
-            language_record[extension][OutputKeys.TOTAL] += tl
-            language_record[extension][OutputKeys.LOC] += l
-            language_record[extension][OutputKeys.COMMENTED] += c
-            language_record[extension][OutputKeys.FILES] += 1
             continue
 
         if not depth:
@@ -172,24 +192,30 @@ def parse_directory_record(
 
         if not directory_filter_function(dir_entry.path):
             continue
-        parse_directory_record(
-            os.scandir(dir_entry.path),
-            config,
-            line_data,
-            language_record,
-            depth - 1,
-            file_parsing_function,
-            file_filter_function,
-            directory_filter_function,
-            minimum_characters,
-        )
 
-    for extension in language_record:
-        language_record[extension][OutputKeys.BLANK] = (
-            language_record[extension][OutputKeys.TOTAL]
-            - language_record[extension][OutputKeys.LOC]
-            - language_record[extension][OutputKeys.COMMENTED]
-        )
+        try:
+            parse_directory_record(
+                os.scandir(dir_entry.path),
+                config,
+                line_data,
+                language_record,
+                depth - 1,
+                file_parsing_function,
+                forbidden_directories,
+                forbidden_files,
+                file_filter_function,
+                directory_filter_function,
+                minimum_characters,
+            )
+
+            for extension in language_record:
+                language_record[extension][OutputKeys.BLANK] = (
+                    language_record[extension][OutputKeys.TOTAL]
+                    - language_record[extension][OutputKeys.LOC]
+                    - language_record[extension][OutputKeys.COMMENTED]
+                )
+        except PermissionError:
+            forbidden_directories.append(dir_entry.path)
 
 
 def parse_directory_verbose(
@@ -198,6 +224,8 @@ def parse_directory_verbose(
     language_record: dict[str, dict[str, int]],
     depth: int,
     file_parsing_function: FileParsingFunction,
+    forbidden_directories: list[str],
+    forbidden_files: list[str],
     file_filter_function: Callable[[str, str], bool] = lambda filename, extension: True,
     directory_filter_function: Callable = lambda _: False,
     minimum_characters: int = 0,
@@ -217,7 +245,7 @@ def parse_directory_verbose(
     :type language_record: dict[str, dict[str, int]]
 
     :param file_parsing_function: Parsing function called for each file
-    :type config: FileParsingFunction
+    :type config: FileParsingFunctionWrapper
 
     :param file_filter_function: Filter function to include/exclude files
     :type file_filter_function: Callable
@@ -270,42 +298,51 @@ def parse_directory_verbose(
                 },
             )
 
-            file_total, file_loc, commented, blank = file_parsing_function(
+            file_total, file_loc, commented, blank = verbose_file_parsing_wrapper(
                 dir_entry.path,
+                extension,
+                language_record,
+                file_parsing_function,
+                forbidden_files,
                 single,
                 multi_start,
                 multi_end,
                 minimum_characters,
             )
+            if file_total > -1:
+                language_record[extension][OutputKeys.TOTAL] += file_total
+                language_record[extension][OutputKeys.LOC] += file_loc
+                language_record[extension][OutputKeys.COMMENTED] += commented
+                language_record[extension][OutputKeys.FILES] += 1
 
-            language_record[extension][OutputKeys.TOTAL] += file_total
-            language_record[extension][OutputKeys.LOC] += file_loc
-            language_record[extension][OutputKeys.COMMENTED] += commented
-            language_record[extension][OutputKeys.FILES] += 1
+                directory_total += file_total
+                directory_loc += file_loc
+                directory_commented += commented
 
-            directory_total += file_total
-            directory_loc += file_loc
-            directory_commented += commented
-
-            files[dir_entry.path] = {
-                OutputKeys.LOC: file_loc,
-                OutputKeys.TOTAL: file_total,
-                OutputKeys.COMMENTED: commented,
-                OutputKeys.BLANK: blank,
-            }
+                files[dir_entry.path] = {
+                    OutputKeys.LOC: file_loc,
+                    OutputKeys.TOTAL: file_total,
+                    OutputKeys.COMMENTED: commented,
+                    OutputKeys.BLANK: blank,
+                }
 
         elif depth and dir_entry.is_dir() and directory_filter_function(dir_entry.path):
-            with os.scandir(dir_entry.path) as directory_iterator:
+            try:
                 child = parse_directory_verbose(
-                    directory_iterator,
+                    os.scandir(dir_entry.path),
                     config,
                     language_record,
                     depth - 1,
                     file_parsing_function,
+                    forbidden_directories,
+                    forbidden_files,
                     file_filter_function,
                     directory_filter_function,
                     minimum_characters,
                 )
+            except PermissionError:
+                forbidden_directories.append(dir_entry.path)
+                continue
 
             subdirectories[dir_entry.name] = child
             directory_total += child[OutputKeys.TOTAL]
