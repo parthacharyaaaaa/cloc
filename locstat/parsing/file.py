@@ -5,6 +5,26 @@ from locstat.data_structures.typing import FileLineData, FileParsingFunction
 from locstat.data_structures.output_keys import OutputKeys
 
 
+def file_parsing_wrapper(
+    file_parsing_function: FileParsingFunction,
+    filepath: str,
+    singleline_symbol: bytes | None = None,
+    multiline_start_symbol: bytes | None = None,
+    multiline_end_symbol: bytes | None = None,
+    minimum_characters: int = 0,
+) -> FileLineData:
+    try:
+        return file_parsing_function(
+            filepath,
+            singleline_symbol,
+            multiline_start_symbol,
+            multiline_end_symbol,
+            minimum_characters,
+        )
+    except PermissionError:
+        raise SystemExit(f"Insufficient permissions to parse: {filepath}")
+
+
 def bare_file_parsing_wrapper(
     filepath: str,
     line_data: array,

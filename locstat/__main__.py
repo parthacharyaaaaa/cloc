@@ -19,6 +19,7 @@ from locstat.parsing.directory import (
     parse_directory_record,
     parse_directory_verbose,
 )
+from locstat.parsing.file import file_parsing_wrapper
 from locstat.utilities.core import (
     construct_directory_filter,
     construct_file_filter,
@@ -75,8 +76,10 @@ def main() -> int:
             args.file.rsplit(".", 1)[-1], (None, None, None)
         )
         singleline_symbol, multiline_start_symbol, multiline_end_symbol = comment_data
-        epoch: float = time.time()
-        total, loc, commented_lines, blank = file_parser_function(
+        epoch: float = time.perf_counter()
+
+        total, loc, commented_lines, blank = file_parsing_wrapper(
+            file_parser_function,
             args.file,
             singleline_symbol,
             multiline_start_symbol,
