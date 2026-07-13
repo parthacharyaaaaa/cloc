@@ -74,11 +74,16 @@ def derive_file_parser(option: ParseMode) -> FileParsingFunction:
 
 def resolve_relative_paths(parent_directory: str, paths: Iterable[str]) -> list[str]:
     parent_path: Path = Path(parent_directory)
-    return [
-        (
-            str((parent_path / path).resolve()).rstrip("\\/")
-            if not Path(path).is_absolute()
-            else path.rstrip("\\/")
-        )
-        for path in paths
-    ]
+    resolved_paths: list[str] = []
+    for str_path in paths:
+        path = Path(str_path)
+        if path.is_absolute():
+            resolved_paths.append(str(path))
+        # For !absolute paths, they are either specified as
+        # parent/dir (relative) or simply dir (implicitly relative)
+        elif path.parent == parent_path:
+            resolved_paths.append(str(path.resolve()))
+        else:
+            resolved_paths.append(str((parent_path / path).resolve()))
+
+    return [resolved_path.rstrip("\\/") for resolved_path in resolved_paths]
